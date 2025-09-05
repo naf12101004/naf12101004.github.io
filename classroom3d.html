@@ -239,6 +239,34 @@
       return group;
     }
 
+    // ====== 이미지 팝업 기능 추가 ======
+const popup = document.createElement('div');
+popup.style.position = 'fixed';
+popup.style.top = '50%';
+popup.style.left = '50%';
+popup.style.transform = 'translate(-50%, -50%)';
+popup.style.background = 'rgba(0,0,0,0.9)';
+popup.style.padding = '20px';
+popup.style.borderRadius = '12px';
+popup.style.zIndex = '100';
+popup.style.display = 'none';
+popup.style.maxWidth = '90vw';
+popup.style.maxHeight = '90vh';
+
+const popupImg = document.createElement('img');
+popupImg.style.maxWidth = '100%';
+popupImg.style.maxHeight = '100%';
+popup.appendChild(popupImg);
+document.body.appendChild(popup);
+
+popup.onclick = () => popup.style.display = 'none';
+
+function showImagePopup(src) {
+  popupImg.src = src;
+  popup.style.display = 'block';
+}
+
+
     // ====== “나” 자리 기준 카메라 배치 ======
     function placeCameraAtMySeat() {
       const { seatData } = loadSaved();
