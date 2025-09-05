@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>너의 이름은 - 교실 3D 뷰</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- 3D 영역 -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script>
+    // ▶ 1. 기본 장면 만들기
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf0f0f0); // 연회색 배경
+
+    const camera = new THREE.PerspectiveCamera(
+      60, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // ▶ 2. 조명
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(0, 10, 10);
+    scene.add(light);
+
+    // ▶ 3. 바닥
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 40),
+      new THREE.MeshStandardMaterial({ color: 0xdcdcdc })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // ▶ 4. 책상 만들기 (6x4)
+    const desks = [];
+    const rows = 4;
+    const cols = 6;
+    const deskSize = { w: 5, h: 2.5 };
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const desk = new THREE.Mesh(
+          new THREE.BoxGeometry(deskSize.w, 2, deskSize.h),
+          new THREE.MeshStandardMaterial({ color: 0x8aaae5 })
+        );
+        desk.position.x = (col - cols / 2) * (deskSize.w + 1);
+        desk.position.z = (row - rows / 2) * (deskSize.h + 2);
+        desk.position.y = 1; // 바닥 위로 약간 띄우기
+        scene.add(desk);
+        desks.push(desk);
+      }
+    }
+
+    // ▶ 5. 칠판 (화면 상단 중앙 고정)
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 5),
+      new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
+    board.position.set(0, 5, -30); // 앞쪽 벽
+    scene.add(board);
+
+    // ▶ 6. 카메라 초기 위치
+    camera.position.set(0, 15, 30);
+    camera.lookAt(0, 0, 0); // 교실 중앙
+
+    // ▶ 7. 렌더링
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // ▶ 8. 반응형 처리
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
