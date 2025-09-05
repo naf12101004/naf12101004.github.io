@@ -144,6 +144,7 @@
   <!-- QR 코드 생성 -->
   <h3>🔗 QR코드로 자리 공유하기</h3>
   <button onclick="generateQRCode()">QR코드 생성</button>
+  <button onclick="window.location.href='classroom3d.html'">3D 보기 실행</button>
   <div id="qrcode" class="qr-area"></div>
 </div>
 
@@ -155,7 +156,6 @@
   <label>사진: <input type="file" id="popupPhoto" accept="image/*" /></label><br><br>
   <button onclick="saveSeatData()">저장</button>
   <button onclick="closePopup()">닫기</button>
-  <button onclick="window.location.href='classroom3d.html'">3D 보기 실행</button>
 </div>
 
 <!-- QR 코드 라이브러리 (qrcodejs) -->
