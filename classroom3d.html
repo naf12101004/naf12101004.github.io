@@ -1,191 +1,197 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>교실 3D 보기</title>
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    canvas { display: block; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Arial', sans-serif;
+    }
     #ui {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 15px;
+      border-radius: 10px;
       z-index: 10;
+      max-width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    #ui h2 {
+      font-size: 20px;
+      margin-top: 0;
+    }
+    #ui label, #ui input, #ui button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      font-size: 14px;
     }
     #ui input, #ui button {
-      font-size: 16px;
-      padding: 4px 8px;
-      margin: 4px 0;
+      padding: 8px;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    .tooltip {
+      font-size: 12px;
+      color: #555;
+      margin-top: -8px;
+      margin-bottom: 6px;
     }
   </style>
 </head>
 <body>
-  <div id="ui">
-    <label for="year">연도: </label>
-    <input type="text" id="year" value="2025" />
-    <button onclick="loadData()">이 연도로 불러오기</button>
-  </div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script>
-    let scene, camera, renderer;
-    let desks = [];
+<div id="ui">
+  <h2>🧭 자리 보기 설정</h2>
+  <label>1. 연도를 입력하세요</label>
+  <input type="text" id="year" placeholder="예: 2025">
+  <div class="tooltip">* 저장한 연도와 동일하게 입력</div>
 
-    init();
+  <label>2. '나'의 자리를 입력 (예: 11)</label>
+  <input type="number" id="myIndex" placeholder="자리 번호 (1부터 시작)">
+  <div class="tooltip">* 사진이 '나'로 저장된 자리 번호 입력</div>
 
-    function init() {
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xf0f0f0);
+  <button onclick="loadData()">이 연도로 불러오기</button>
+</div>
 
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
+<div id="canvas-container"></div>
 
-      const light = new THREE.DirectionalLight(0xffffff, 1);
-      light.position.set(10, 20, 10);
-      scene.add(light);
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/controls/OrbitControls.js"></script>
+<script>
+let camera, scene, renderer, controls;
+let desks = [];
 
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
+function loadData() {
+  const year = document.getElementById('year').value;
+  const myIndex = parseInt(document.getElementById('myIndex').value) - 1;
+  const rawData = localStorage.getItem(`seatData_${year}`);
+  if (!rawData) {
+    alert(`${year}년 데이터가 없습니다.`);
+    return;
+  }
 
-      animate();
+  const seatData = JSON.parse(rawData);
+  const total = seatData.length;
+  const cols = Math.ceil(Math.sqrt(total));
+  const rows = Math.ceil(total / cols);
+
+  initScene();
+  createClassroom(rows, cols, seatData, myIndex);
+}
+
+function initScene() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+  renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById('canvas-container').innerHTML = '';
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enablePan = false;
+  controls.maxPolarAngle = Math.PI / 2.5;
+  controls.minDistance = 150;
+  controls.maxDistance = 500;
+
+  const light = new THREE.AmbientLight(0xffffff, 1);
+  scene.add(light);
+  animate();
+}
+
+function createClassroom(rows, cols, seatData, myIndex) {
+  const deskSize = { w: 80, h: 50 };
+  const spacingX = 100, spacingY = 80;
+  const offsetX = -((cols - 1) * spacingX) / 2;
+  const offsetY = ((rows - 1) * spacingY) / 2;
+
+  desks = [];
+
+  for (let i = 0; i < seatData.length; i++) {
+    const data = seatData[i];
+    if (!data) continue;
+
+    const group = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(deskSize.w, deskSize.h, 10);
+    const material = new THREE.MeshBasicMaterial({ color: data.name === '나' ? 0x99ccff : 0xdddddd });
+    const desk = new THREE.Mesh(geometry, material);
+    group.add(desk);
+
+    // 사진 추가
+    if (data.photo) {
+      const texture = new THREE.TextureLoader().load(data.photo);
+      const photo = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+      );
+      photo.position.set(0, 30, 5);
+      group.add(photo);
     }
 
-    function createDeskWithInfo(seat) {
-      const group = new THREE.Group();
+    // 이름 추가
+    const nameCanvas = document.createElement('canvas');
+    nameCanvas.width = 256;
+    nameCanvas.height = 64;
+    const ctx = nameCanvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(data.name, 128, 40);
+    const nameTex = new THREE.CanvasTexture(nameCanvas);
+    const nameMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 20),
+      new THREE.MeshBasicMaterial({ map: nameTex, transparent: true })
+    );
+    nameMesh.position.set(0, 60, 5);
+    group.add(nameMesh);
 
-      const deskGeometry = new THREE.BoxGeometry(8, 2, 8);
-      const deskMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-      const desk = new THREE.Mesh(deskGeometry, deskMaterial);
-      group.add(desk);
-
-      if (seat.photo) {
-        const photoTexture = new THREE.TextureLoader().load(seat.photo);
-        const photoGeometry = new THREE.PlaneGeometry(6, 6);
-        const photoMaterial = new THREE.MeshBasicMaterial({ map: photoTexture });
-        const photoMesh = new THREE.Mesh(photoGeometry, photoMaterial);
-        photoMesh.position.set(0, 5, 0);
-        photoMesh.userData = { fullImage: seat.photo };
-        photoMesh.cursor = 'pointer';
-        photoMesh.onClick = () => {
-          window.open(seat.photo, '_blank');
-        };
-        group.add(photoMesh);
-
-        // 카드 테두리 추가
-        const borderGeo = new THREE.PlaneGeometry(6.2, 6.2);
-        const borderMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-        const border = new THREE.Mesh(borderGeo, borderMat);
-        border.position.set(0, 5, -0.01);
-        group.add(border);
-      }
-
-      if (seat.name) {
-        const nameCanvas = document.createElement('canvas');
-        nameCanvas.width = 256;
-        nameCanvas.height = 64;
-        const ctx = nameCanvas.getContext('2d');
-        ctx.fillStyle = 'black';
-        ctx.font = '20px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(seat.name, 128, 40);
-
-        const nameTexture = new THREE.CanvasTexture(nameCanvas);
-        const nameMaterial = new THREE.MeshBasicMaterial({ map: nameTexture, transparent: true });
-        const nameGeometry = new THREE.PlaneGeometry(6, 1.5);
-        const nameMesh = new THREE.Mesh(nameGeometry, nameMaterial);
-        nameMesh.position.set(0, 3.2, -5);
-        group.add(nameMesh);
-      }
-
-      if (seat.memo) {
-        const memoCanvas = document.createElement('canvas');
-        memoCanvas.width = 256;
-        memoCanvas.height = 64;
-        const ctx = memoCanvas.getContext('2d');
-        ctx.fillStyle = 'gray';
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(seat.memo, 128, 40);
-
-        const memoTexture = new THREE.CanvasTexture(memoCanvas);
-        const memoMaterial = new THREE.MeshBasicMaterial({ map: memoTexture, transparent: true });
-        const memoGeometry = new THREE.PlaneGeometry(6, 1.2);
-        const memoMesh = new THREE.Mesh(memoGeometry, memoMaterial);
-        memoMesh.position.set(0, 1.6, -5);
-        group.add(memoMesh);
-      }
-
-      return group;
+    // 메모 추가
+    if (data.memo) {
+      const memoCanvas = document.createElement('canvas');
+      memoCanvas.width = 256;
+      memoCanvas.height = 64;
+      const mctx = memoCanvas.getContext('2d');
+      mctx.fillStyle = '#333';
+      mctx.font = '14px Arial';
+      mctx.textAlign = 'center';
+      mctx.fillText(data.memo, 128, 40);
+      const memoTex = new THREE.CanvasTexture(memoCanvas);
+      const memoMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 20),
+        new THREE.MeshBasicMaterial({ map: memoTex, transparent: true })
+      );
+      memoMesh.position.set(0, 45, 5);
+      group.add(memoMesh);
     }
 
-    function loadData() {
-      const year = document.getElementById("year").value;
-      const layoutRows = parseInt(localStorage.getItem("layout_rows_" + year));
-      const layoutCols = parseInt(localStorage.getItem("layout_cols_" + year));
-      const seatData = JSON.parse(localStorage.getItem("seatData_" + year));
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    group.position.set(offsetX + col * spacingX, 0, offsetY - row * spacingY);
+    scene.add(group);
+    desks.push(group);
+  }
 
-      if (!layoutRows || !layoutCols || !seatData) {
-        alert("데이터를 찾을 수 없습니다.");
-        return;
-      }
+  // 카메라 초기 위치 설정
+  if (myIndex >= 0 && myIndex < desks.length) {
+    const pos = desks[myIndex].position;
+    camera.position.set(pos.x, 200, pos.z + 200);
+    controls.target.set(pos.x, 0, pos.z);
+  } else {
+    camera.position.set(0, 200, 300);
+    controls.target.set(0, 0, 0);
+  }
+  controls.update();
+}
 
-      desks.forEach(d => scene.remove(d));
-      desks = [];
-
-      for (let r = 0; r < layoutRows; r++) {
-        for (let c = 0; c < layoutCols; c++) {
-          const index = r * layoutCols + c;
-          const seat = seatData[index] || {};
-          const desk = createDeskWithInfo(seat);
-          desk.position.set(c * 12, 0, r * 12);
-          desks.push(desk);
-          scene.add(desk);
-        }
-      }
-
-      const myIndex = seatData.findIndex(s => s.name === "나");
-      if (myIndex >= 0) {
-        const row = Math.floor(myIndex / layoutCols);
-        const col = myIndex % layoutCols;
-        const myX = col * 12;
-        const myZ = row * 12;
-        camera.position.set(myX, 20, myZ + 20);
-        camera.lookAt(myX, 0, myZ - 20);
-      }
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-
-    // 사진 클릭 이벤트 연결용 Raycaster
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    window.addEventListener('click', (event) => {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(scene.children, true);
-      for (let i = 0; i < intersects.length; i++) {
-        const obj = intersects[i].object;
-        if (obj.onClick) {
-          obj.onClick();
-          break;
-        }
-      }
-    });
-  </script>
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+</script>
 </body>
 </html>
