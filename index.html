@@ -1,192 +1,214 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>교실 자리 배치 3D 보기</title>
+  <meta charset="UTF-8" />
+  <title>자리 등록 - 너의 이름은...</title>
   <style>
     body {
-      margin: 0;
-      overflow: hidden;
       font-family: 'Arial', sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
     }
-    #ui {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 15px;
-      border-radius: 10px;
-      z-index: 10;
-      max-width: 300px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    #ui h2 {
-      font-size: 20px;
-      margin-top: 0;
+    h1 {
+      text-align: center;
+      color: #333;
     }
-    #ui label, #ui input, #ui button {
-      display: block;
+    label {
+      font-weight: bold;
+    }
+    .step {
+      font-size: 13px;
+      color: #777;
+      margin-bottom: 4px;
+    }
+    input, button {
       width: 100%;
-      margin-bottom: 10px;
-      font-size: 14px;
+      padding: 10px;
+      margin-bottom: 12px;
+      font-size: 16px;
+      box-sizing: border-box;
     }
-    #ui input, #ui button {
-      padding: 8px;
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
-    #canvas-container {
-      width: 100vw;
-      height: 100vh;
+    button:hover {
+      background-color: #45a049;
     }
-    .tooltip {
-      font-size: 12px;
-      color: #555;
-      margin-top: -8px;
-      margin-bottom: 6px;
+    .seat {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      background-color: #fafafa;
+      cursor: pointer;
+    }
+    #seatArea {
+      margin-top: 20px;
+    }
+    #seatArea img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-bottom: 4px;
     }
   </style>
 </head>
 <body>
-<div id="ui">
-  <h2>🧭 자리 보기 설정</h2>
-  <label>① 연도를 입력하세요</label>
+<div class="container">
+  <h1>🪑 자리 정보 입력</h1>
+
+  <div class="step">1. 연도 입력 (예: 2025)</div>
   <input type="text" id="year" placeholder="예: 2025">
-  <div class="tooltip">* 저장한 연도와 동일하게 입력</div>
 
-  <label>② '나'의 자리를 입력 (예: 11)</label>
-  <input type="number" id="myIndex" placeholder="자리 번호 (1부터 시작)">
-  <div class="tooltip">* 사진이 '나'로 저장된 자리 번호 입력</div>
+  <div class="step">2. 내 이름 입력 (자리 강조용)</div>
+  <input type="text" id="myName" placeholder="예: 홍길동">
 
-  <button onclick="loadData()">이 연도로 불러오기</button>
+  <div class="step">3. 가로 × 세로 자리 수 설정</div>
+  <input type="number" id="cols" placeholder="가로 (예: 6)">
+  <input type="number" id="rows" placeholder="세로 (예: 4)">
+  <button onclick="generateSeats()">자리 만들기</button>
+
+  <div class="step">4. 각 자리를 클릭해 정보 입력</div>
+  <div id="seatArea"></div>
+
+  <div class="step">5. 저장 및 불러오기</div>
+  <button onclick="saveData()">자리 저장</button>
+  <button onclick="loadData()">자리 불러오기</button>
 </div>
 
-<div id="canvas-container"></div>
+<div id="popup" style="display:none; position:fixed; top:30%; left:50%; transform:translateX(-50%); background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.3);">
+  <h3>자리 정보 입력</h3>
+  <input type="text" id="popupName" placeholder="이름">
+  <input type="text" id="popupMemo" placeholder="메모">
+  <input type="file" id="popupPhoto" accept="image/*">
+  <button onclick="saveSeatData()">저장</button>
+  <button onclick="closePopup()">닫기</button>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/controls/OrbitControls.js"></script>
 <script>
-let camera, scene, renderer, controls;
-let deskSize = { w: 80, h: 50 };
-let desks = [], photos = [];
+let selectedSeat = null;
+let seatData = [];
+
+function generateSeats() {
+  const cols = parseInt(document.getElementById('cols').value);
+  const rows = parseInt(document.getElementById('rows').value);
+  const seatArea = document.getElementById('seatArea');
+  seatArea.innerHTML = '';
+  seatData = new Array(rows * cols).fill(null);
+
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.style.gap = '8px';
+
+  for (let i = 0; i < rows * cols; i++) {
+    const seat = document.createElement('div');
+    seat.className = 'seat';
+    seat.innerText = `자리 ${i + 1}`;
+    seat.dataset.index = i;
+    seat.onclick = () => openPopup(seat);
+    grid.appendChild(seat);
+  }
+  seatArea.appendChild(grid);
+}
+
+function openPopup(seat) {
+  selectedSeat = seat;
+  document.getElementById('popup').style.display = 'block';
+}
+
+function closePopup() {
+  document.getElementById('popup').style.display = 'none';
+  document.getElementById('popupName').value = '';
+  document.getElementById('popupMemo').value = '';
+  document.getElementById('popupPhoto').value = '';
+}
+
+function saveSeatData() {
+  const name = document.getElementById('popupName').value;
+  const memo = document.getElementById('popupMemo').value;
+  const photoInput = document.getElementById('popupPhoto');
+  const index = selectedSeat.dataset.index;
+
+  const reader = new FileReader();
+  const updateSeat = (photo) => {
+    selectedSeat.innerHTML = '';
+    if (photo) {
+      const img = document.createElement('img');
+      img.src = photo;
+      selectedSeat.appendChild(img);
+    }
+    const nameDiv = document.createElement('div');
+    nameDiv.innerText = name;
+    nameDiv.style.fontWeight = 'bold';
+    selectedSeat.appendChild(nameDiv);
+
+    const memoDiv = document.createElement('div');
+    memoDiv.innerText = memo;
+    selectedSeat.appendChild(memoDiv);
+
+    seatData[index] = { name, memo, photo };
+    closePopup();
+  };
+
+  if (photoInput.files[0]) {
+    reader.onload = (e) => updateSeat(e.target.result);
+    reader.readAsDataURL(photoInput.files[0]);
+  } else {
+    updateSeat(null);
+  }
+}
+
+function saveData() {
+  const year = document.getElementById('year').value;
+  localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
+  alert(`${year}년 저장 완료`);
+}
 
 function loadData() {
   const year = document.getElementById('year').value;
-  const myIndex = parseInt(document.getElementById('myIndex').value) - 1;
-  const rawData = localStorage.getItem(`seatData_${year}`);
-  if (!rawData) {
+  const raw = localStorage.getItem(`seatData_${year}`);
+  if (!raw) {
     alert(`${year}년 데이터가 없습니다.`);
     return;
   }
-
-  const seatData = JSON.parse(rawData);
+  seatData = JSON.parse(raw);
+  const cols = parseInt(document.getElementById('cols').value);
   const total = seatData.length;
-  const cols = Math.ceil(Math.sqrt(total));
   const rows = Math.ceil(total / cols);
+  document.getElementById('rows').value = rows;
+  generateSeats();
 
-  // 초기화
-  initScene();
-  createClassroom(rows, cols, seatData, myIndex);
-}
-
-function initScene() {
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 1000);
-  renderer = new THREE.WebGLRenderer({antialias: true});
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.getElementById('canvas-container').innerHTML = '';
-  document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enablePan = false;
-  controls.maxPolarAngle = Math.PI / 2.5;
-  controls.minDistance = 150;
-  controls.maxDistance = 500;
-
-  const light = new THREE.AmbientLight(0xffffff, 1);
-  scene.add(light);
-
-  animate();
-}
-
-function createClassroom(rows, cols, seatData, myIndex) {
-  const spacingX = 100, spacingY = 80;
-  const offsetX = -((cols-1)*spacingX)/2;
-  const offsetY = ((rows-1)*spacingY)/2;
-
-  for (let i = 0; i < seatData.length; i++) {
-    const data = seatData[i];
-    if (!data) continue;
-
-    const group = new THREE.Group();
-    const geometry = new THREE.BoxGeometry(deskSize.w, deskSize.h, 10);
-    const material = new THREE.MeshBasicMaterial({color: (data.name === '나') ? 0x99ccff : 0xdddddd});
-    const desk = new THREE.Mesh(geometry, material);
-    group.add(desk);
-
-    // 사진
-    if (data.photo) {
-      const texture = new THREE.TextureLoader().load(data.photo);
-      const photoGeo = new THREE.PlaneGeometry(60, 60);
-      const photoMat = new THREE.MeshBasicMaterial({map: texture, transparent: true});
-      const photoMesh = new THREE.Mesh(photoGeo, photoMat);
-      photoMesh.position.set(0, 30, 5);
-      group.add(photoMesh);
+  const seats = document.querySelectorAll('.seat');
+  seatData.forEach((d, i) => {
+    if (!d || !seats[i]) return;
+    seats[i].innerHTML = '';
+    if (d.photo) {
+      const img = document.createElement('img');
+      img.src = d.photo;
+      seats[i].appendChild(img);
     }
+    const nameDiv = document.createElement('div');
+    nameDiv.innerText = d.name;
+    nameDiv.style.fontWeight = 'bold';
+    seats[i].appendChild(nameDiv);
 
-    // 이름
-    const nameCanvas = document.createElement('canvas');
-    nameCanvas.width = 256;
-    nameCanvas.height = 64;
-    const ctx = nameCanvas.getContext('2d');
-    ctx.fillStyle = 'black';
-    ctx.font = '20px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(data.name, 128, 40);
-    const nameTexture = new THREE.CanvasTexture(nameCanvas);
-    const nameMat = new THREE.MeshBasicMaterial({map: nameTexture, transparent: true});
-    const namePlane = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), nameMat);
-    namePlane.position.set(0, 60, 5);
-    group.add(namePlane);
-
-    // 메모
-    if (data.memo) {
-      const memoCanvas = document.createElement('canvas');
-      memoCanvas.width = 256;
-      memoCanvas.height = 64;
-      const mctx = memoCanvas.getContext('2d');
-      mctx.fillStyle = '#333';
-      mctx.font = '14px Arial';
-      mctx.textAlign = 'center';
-      mctx.fillText(data.memo, 128, 40);
-      const memoTexture = new THREE.CanvasTexture(memoCanvas);
-      const memoMat = new THREE.MeshBasicMaterial({map: memoTexture, transparent: true});
-      const memoPlane = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), memoMat);
-      memoPlane.position.set(0, 45, 5);
-      group.add(memoPlane);
-    }
-
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    group.position.set(offsetX + col * spacingX, 0, offsetY - row * spacingY);
-    scene.add(group);
-
-    desks.push(group);
-  }
-
-  // 카메라 위치 (내 자리 기준)
-  if (myIndex >= 0 && myIndex < desks.length) {
-    const pos = desks[myIndex].position;
-    camera.position.set(pos.x, 200, pos.z + 200);
-    controls.target.set(pos.x, 0, pos.z);
-  } else {
-    camera.position.set(0, 200, 300);
-    controls.target.set(0, 0, 0);
-  }
-  controls.update();
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera);
+    const memoDiv = document.createElement('div');
+    memoDiv.innerText = d.memo;
+    seats[i].appendChild(memoDiv);
+  });
 }
 </script>
 </body>
