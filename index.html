@@ -44,13 +44,6 @@
       background-color: #45a049;
     }
 
-    #seatArea img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 4px;
-      margin-bottom: 4px;
-    }
-
     .seat {
       border: 1px solid #ccc;
       border-radius: 6px;
@@ -59,6 +52,13 @@
       background-color: #fafafa;
       cursor: pointer;
       word-wrap: break-word;
+    }
+
+    #seatArea img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-bottom: 4px;
     }
 
     #popup {
@@ -87,8 +87,8 @@
     <label for="myName">내 이름 입력:</label>
     <input type="text" id="myName" placeholder="예: 홍길동" />
 
-    <button onclick="saveData()">저장</button>
-    <button onclick="loadData()">불러오기</button>
+    <button onclick="saveUserData()">이름 저장</button>
+    <button onclick="loadUserData()">이름 불러오기</button>
 
     <hr style="margin: 20px 0;" />
 
@@ -100,10 +100,13 @@
 
     <button onclick="generateSeats()">자리 만들기</button>
 
+    <button onclick="saveSeatLayout()">자리배치 저장</button>
+    <button onclick="loadSeatLayout()">자리배치 불러오기</button>
+
     <div id="seatArea" style="margin-top: 20px;"></div>
   </div>
 
-  <!-- 입력 팝업 -->
+  <!-- 팝업 -->
   <div id="popup">
     <h3>자리 정보 입력</h3>
     <label>이름: <input type="text" id="popupName" /></label><br><br>
@@ -114,36 +117,20 @@
   </div>
 
   <script>
-    // 이름/연도 저장
-    function saveData() {
-      const year = document.getElementById('year').value;
-      const name = document.getElementById('myName').value;
-
-      if (!year || !name) {
-        alert('년도와 이름을 모두 입력해 주세요.');
-        return;
-      }
-
-      localStorage.setItem('savedYear', year);
-      localStorage.setItem('savedName', name);
-      alert('저장되었습니다!');
-    }
-
-    function loadData() {
-      const savedYear = localStorage.getItem('savedYear');
-      const savedName = localStorage.getItem('savedName');
-
-      if (savedYear && savedName) {
-        document.getElementById('year').value = savedYear;
-        document.getElementById('myName').value = savedName;
-        alert('불러오기 성공!');
-      } else {
-        alert('저장된 데이터가 없습니다.');
-      }
-    }
-
-    // 자리배치 생성
     let selectedSeat = null;
+    let seatData = []; // 전체 좌석 정보 저장
+
+    function saveUserData() {
+      localStorage.setItem('savedYear', document.getElementById('year').value);
+      localStorage.setItem('savedName', document.getElementById('myName').value);
+      alert('이름 저장 완료!');
+    }
+
+    function loadUserData() {
+      document.getElementById('year').value = localStorage.getItem('savedYear') || '';
+      document.getElementById('myName').value = localStorage.getItem('savedName') || '';
+      alert('이름 불러오기 완료!');
+    }
 
     function generateSeats() {
       const rows = parseInt(document.getElementById('rows').value);
@@ -154,6 +141,8 @@
         alert("행과 열을 올바르게 입력하세요.");
         return;
       }
+
+      seatData = new Array(rows * cols).fill(null); // 초기화
 
       seatArea.innerHTML = '';
       const seatGrid = document.createElement('div');
@@ -188,20 +177,21 @@
     function saveSeatData() {
       const name = document.getElementById('popupName').value;
       const memo = document.getElementById('popupMemo').value;
-      const photoInput = document.getElementById('popupPhoto');
-      const photoFile = photoInput.files[0];
+      const photoFile = document.getElementById('popupPhoto').files[0];
+      const index = selectedSeat.dataset.index;
 
-      if (!selectedSeat) return;
       selectedSeat.innerHTML = '';
-
       if (photoFile) {
         const reader = new FileReader();
         reader.onload = function (e) {
           const img = document.createElement('img');
           img.src = e.target.result;
           selectedSeat.appendChild(img);
+          seatData[index] = { name, memo, photo: img.src };
         };
         reader.readAsDataURL(photoFile);
+      } else {
+        seatData[index] = { name, memo, photo: null };
       }
 
       const nameDiv = document.createElement('div');
@@ -213,13 +203,80 @@
       memoDiv.innerText = memo;
       selectedSeat.appendChild(memoDiv);
 
-      // "나" 강조
       if (name.trim() === '나') {
         selectedSeat.style.backgroundColor = '#d1eaff';
         selectedSeat.style.border = '2px solid #2196F3';
       }
 
       closePopup();
+    }
+
+    function saveSeatLayout() {
+      const year = document.getElementById('year').value;
+      if (!year) {
+        alert("년도 입력이 필요합니다.");
+        return;
+      }
+      localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
+      alert(`"${year}"년 자리배치 저장 완료!`);
+    }
+
+    function loadSeatLayout() {
+      const year = document.getElementById('year').value;
+      const saved = localStorage.getItem(`seatData_${year}`);
+      if (!saved) {
+        alert(`"${year}"년 데이터가 없습니다.`);
+        return;
+      }
+
+      const parsed = JSON.parse(saved);
+      seatData = parsed;
+      const seatArea = document.getElementById('seatArea');
+      const cols = parseInt(document.getElementById('cols').value);
+      const total = parsed.length;
+      const rows = Math.ceil(total / cols);
+
+      seatArea.innerHTML = '';
+      const seatGrid = document.createElement('div');
+      seatGrid.style.display = 'grid';
+      seatGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      seatGrid.style.gap = '8px';
+
+      for (let i = 0; i < total; i++) {
+        const seat = document.createElement('div');
+        seat.className = 'seat';
+        seat.dataset.index = i;
+
+        const data = parsed[i];
+        if (data) {
+          if (data.photo) {
+            const img = document.createElement('img');
+            img.src = data.photo;
+            seat.appendChild(img);
+          }
+
+          const nameDiv = document.createElement('div');
+          nameDiv.innerText = data.name;
+          nameDiv.style.fontWeight = 'bold';
+          seat.appendChild(nameDiv);
+
+          const memoDiv = document.createElement('div');
+          memoDiv.innerText = data.memo;
+          seat.appendChild(memoDiv);
+
+          if (data.name.trim() === '나') {
+            seat.style.backgroundColor = '#d1eaff';
+            seat.style.border = '2px solid #2196F3';
+          }
+        } else {
+          seat.innerText = `자리 ${i + 1}`;
+        }
+
+        seat.onclick = () => openPopup(seat);
+        seatGrid.appendChild(seat);
+      }
+
+      seatArea.appendChild(seatGrid);
     }
   </script>
 
