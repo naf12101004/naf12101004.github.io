@@ -202,16 +202,16 @@ function makeDeskCard(d, basePos) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0,0,256,64);
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 80px sans-serif';
+  ctx.font = 'bold 20px sans-serif';
   ctx.fillText(d.name || '(빈자리)', 10, 22);
-  ctx.font = '30px sans-serif';
+  ctx.font = '14px sans-serif';
   ctx.fillText(d.memo || '', 10, 42);
 
   const texture = new THREE.CanvasTexture(canvas);
   const labelMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const label = new THREE.Sprite(labelMat);
   label.scale.set(4, 1, 1);
-  label.position.set(basePos.x, basePos.y + 1, basePos.z);
+  label.position.set(basePos.x, basePos.y + 3.1, basePos.z);
   group.add(label);
 
   return group;
