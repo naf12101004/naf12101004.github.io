@@ -290,12 +290,12 @@
     // ====== 센서(기기 회전) — 교실을 회전 ======
     let baseAlpha = null;
     function handleOrientation(e) {
-      // e.alpha: 0~360 (기기 방위)
-      if (typeof e.alpha !== 'number') return;
-      if (baseAlpha === null) baseAlpha = e.alpha;               // 초기 기준
-      const yaw = THREE.MathUtils.degToRad(e.alpha - baseAlpha); // 좌우 회전
-      classroom.rotation.y = yaw;
-    }
+  if (typeof e.alpha !== 'number') return;
+  if (baseAlpha === null) baseAlpha = e.alpha;
+  const yaw = THREE.MathUtils.degToRad(baseAlpha - e.alpha); // 🔄 방향 반전됨
+  classroom.rotation.y = yaw;
+}
+
     async function enableSensor() {
       // iOS 권한 요청
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
