@@ -1,410 +1,192 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>너의 이름은...</title>
+  <meta charset="UTF-8">
+  <title>교실 자리 배치 3D 보기</title>
   <style>
     body {
+      margin: 0;
+      overflow: hidden;
       font-family: 'Arial', sans-serif;
-      padding: 20px;
-      background-color: #f5f5f5;
     }
-
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-
-    button {
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 6px;
-    }
-
-    button:hover {
-      background-color: #45a049;
-    }
-
-    .seat {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 12px;
-      text-align: center;
-      background-color: #fafafa;
-      cursor: pointer;
-      word-wrap: break-word;
-    }
-
-    #seatArea, #compareArea {
-      margin-top: 20px;
-    }
-
-    #seatArea img, .seat img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 4px;
-      margin-bottom: 4px;
-    }
-
-    #popup {
-      display: none;
-      position: fixed;
-      top: 30%;
-      left: 50%;
-      transform: translate(-50%, -30%);
-      background: white;
-      border: 1px solid #ccc;
-      padding: 20px;
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 15px;
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
       z-index: 10;
+      max-width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
     }
-
-    .compare-grid {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      justify-content: center;
+    #ui h2 {
+      font-size: 20px;
+      margin-top: 0;
     }
-
-    .compare-box {
-      flex: 1;
-      min-width: 300px;
+    #ui label, #ui input, #ui button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      font-size: 14px;
     }
-
-    .qr-area {
-      margin-top: 30px;
-      text-align: center;
+    #ui input, #ui button {
+      padding: 8px;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    .tooltip {
+      font-size: 12px;
+      color: #555;
+      margin-top: -8px;
+      margin-bottom: 6px;
     }
   </style>
 </head>
 <body>
+<div id="ui">
+  <h2>🧭 자리 보기 설정</h2>
+  <label>① 연도를 입력하세요</label>
+  <input type="text" id="year" placeholder="예: 2025">
+  <div class="tooltip">* 저장한 연도와 동일하게 입력</div>
 
-<div class="container">
-  <h1>너의 이름은...</h1>
+  <label>② '나'의 자리를 입력 (예: 11)</label>
+  <input type="number" id="myIndex" placeholder="자리 번호 (1부터 시작)">
+  <div class="tooltip">* 사진이 '나'로 저장된 자리 번호 입력</div>
 
-  <!-- 기본 정보 -->
-  <label for="year">년도 입력:</label>
-  <input type="text" id="year" placeholder="예: 2021" />
-
-  <label for="myName">내 이름 입력:</label>
-  <input type="text" id="myName" placeholder="예: 홍길동" />
-
-  <button onclick="saveUserData()">이름 저장</button>
-  <button onclick="loadUserData()">이름 불러오기</button>
-
-  <hr style="margin: 20px 0;" />
-
-  <!-- 자리 배치 -->
-  <label for="cols">가로 칸 수 (열):</label>
-  <input type="number" id="cols" placeholder="예: 5" />
-
-  <label for="rows">세로 칸 수 (행):</label>
-  <input type="number" id="rows" placeholder="예: 4" />
-
-  <button onclick="generateSeats()">자리 만들기</button>
-  <button onclick="saveSeatLayout()">자리배치 저장</button>
-  <button onclick="loadSeatLayout()">자리배치 불러오기</button>
-
-  <div id="seatArea"></div>
-
-  <hr style="margin: 30px 0;" />
-
-  <!-- 다년간 비교 -->
-  <h3>📆 다년간 비교 모드</h3>
-  <label for="year1">첫 번째 연도:</label>
-  <input type="text" id="year1" placeholder="예: 2021" />
-  <label for="year2">두 번째 연도:</label>
-  <input type="text" id="year2" placeholder="예: 2022" />
-  <button onclick="compareYears()">비교하기</button>
-
-  <div id="compareArea" class="compare-grid"></div>
-
-  <hr style="margin: 30px 0;" />
-
-  <!-- QR 코드 생성 -->
-  <h3>🔗 QR코드로 자리 공유하기</h3>
-  <button onclick="generateQRCode()">QR코드 생성</button>
-  <div id="qrcode" class="qr-area"></div>
+  <button onclick="loadData()">이 연도로 불러오기</button>
 </div>
 
-<!-- 입력 팝업 -->
-<div id="popup">
-  <h3>자리 정보 입력</h3>
-  <label>이름: <input type="text" id="popupName" /></label><br><br>
-  <label>메모: <input type="text" id="popupMemo" /></label><br><br>
-  <label>사진: <input type="file" id="popupPhoto" accept="image/*" /></label><br><br>
-  <button onclick="saveSeatData()">저장</button>
-  <button onclick="closePopup()">닫기</button>
-</div>
+<div id="canvas-container"></div>
 
-<!-- QR 코드 라이브러리 (qrcodejs) -->
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/controls/OrbitControls.js"></script>
 <script>
-let selectedSeat = null;
-let seatData = [];
+let camera, scene, renderer, controls;
+let deskSize = { w: 80, h: 50 };
+let desks = [], photos = [];
 
-function saveUserData() {
-  localStorage.setItem('savedYear', document.getElementById('year').value);
-  localStorage.setItem('savedName', document.getElementById('myName').value);
-  alert('이름 저장 완료!');
-}
-
-function loadUserData() {
-  document.getElementById('year').value = localStorage.getItem('savedYear') || '';
-  document.getElementById('myName').value = localStorage.getItem('savedName') || '';
-  alert('이름 불러오기 완료!');
-}
-
-function generateSeats() {
-  const rows = parseInt(document.getElementById('rows').value);
-  const cols = parseInt(document.getElementById('cols').value);
-  const seatArea = document.getElementById('seatArea');
-
-  if (!rows || !cols || rows <= 0 || cols <= 0) {
-    alert("행과 열을 올바르게 입력하세요.");
-    return;
-  }
-
-  seatData = new Array(rows * cols).fill(null);
-  seatArea.innerHTML = '';
-
-  const seatGrid = document.createElement('div');
-  seatGrid.style.display = 'grid';
-  seatGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  seatGrid.style.gap = '8px';
-
-  for (let i = 0; i < rows * cols; i++) {
-    const seat = document.createElement('div');
-    seat.className = 'seat';
-    seat.dataset.index = i;
-    seat.innerText = `자리 ${i + 1}`;
-    seat.onclick = () => openPopup(seat);
-    seatGrid.appendChild(seat);
-  }
-
-  seatArea.appendChild(seatGrid);
-}
-
-function openPopup(seat) {
-  selectedSeat = seat;
-  document.getElementById('popup').style.display = 'block';
-}
-
-function closePopup() {
-  document.getElementById('popup').style.display = 'none';
-  document.getElementById('popupName').value = '';
-  document.getElementById('popupMemo').value = '';
-  document.getElementById('popupPhoto').value = '';
-}
-
-function saveSeatData() {
-  const name = document.getElementById('popupName').value;
-  const memo = document.getElementById('popupMemo').value;
-  const photoInput = document.getElementById('popupPhoto');
-  const photoFile = photoInput.files[0];
-  const index = selectedSeat.dataset.index;
-
-  selectedSeat.innerHTML = '';
-
-  if (photoFile) {
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const img = document.createElement('img');
-      img.src = e.target.result;
-      selectedSeat.appendChild(img);
-      seatData[index] = { name, memo, photo: img.src };
-    };
-    reader.readAsDataURL(photoFile);
-  } else {
-    seatData[index] = { name, memo, photo: null };
-  }
-
-  const nameDiv = document.createElement('div');
-  nameDiv.innerText = name;
-  nameDiv.style.fontWeight = 'bold';
-  selectedSeat.appendChild(nameDiv);
-
-  const memoDiv = document.createElement('div');
-  memoDiv.innerText = memo;
-  selectedSeat.appendChild(memoDiv);
-
-  if (name.trim() === '나') {
-    selectedSeat.style.backgroundColor = '#d1eaff';
-    selectedSeat.style.border = '2px solid #2196F3';
-  }
-
-  closePopup();
-}
-
-function saveSeatLayout() {
+function loadData() {
   const year = document.getElementById('year').value;
-  if (!year) {
-    alert("년도 입력이 필요합니다.");
-    return;
-  }
-  localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
-  localStorage.setItem(`layout_rows_${year}`, document.getElementById('rows').value);
-  localStorage.setItem(`layout_cols_${year}`, document.getElementById('cols').value);
-  alert(`"${year}"년 자리배치 저장 완료!`);
-}
-
-function loadSeatLayout() {
-  const year = document.getElementById('year').value;
-  const saved = localStorage.getItem(`seatData_${year}`);
-  if (!saved) {
-    alert(`"${year}"년 데이터가 없습니다.`);
+  const myIndex = parseInt(document.getElementById('myIndex').value) - 1;
+  const rawData = localStorage.getItem(`seatData_${year}`);
+  if (!rawData) {
+    alert(`${year}년 데이터가 없습니다.`);
     return;
   }
 
-  const parsed = JSON.parse(saved);
-  seatData = parsed;
-  const seatArea = document.getElementById('seatArea');
-  const cols = parseInt(document.getElementById('cols').value);
-  const total = parsed.length;
+  const seatData = JSON.parse(rawData);
+  const total = seatData.length;
+  const cols = Math.ceil(Math.sqrt(total));
   const rows = Math.ceil(total / cols);
 
-  seatArea.innerHTML = '';
-  const seatGrid = document.createElement('div');
-  seatGrid.style.display = 'grid';
-  seatGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  seatGrid.style.gap = '8px';
-
-  for (let i = 0; i < total; i++) {
-    const seat = document.createElement('div');
-    seat.className = 'seat';
-    seat.dataset.index = i;
-
-    const data = parsed[i];
-    if (data) {
-      if (data.photo) {
-        const img = document.createElement('img');
-        img.src = data.photo;
-        seat.appendChild(img);
-      }
-
-      const nameDiv = document.createElement('div');
-      nameDiv.innerText = data.name;
-      nameDiv.style.fontWeight = 'bold';
-      seat.appendChild(nameDiv);
-
-      const memoDiv = document.createElement('div');
-      memoDiv.innerText = data.memo;
-      seat.appendChild(memoDiv);
-
-      if (data.name.trim() === '나') {
-        seat.style.backgroundColor = '#d1eaff';
-        seat.style.border = '2px solid #2196F3';
-      }
-    } else {
-      seat.innerText = `자리 ${i + 1}`;
-    }
-
-    seat.onclick = () => openPopup(seat);
-    seatGrid.appendChild(seat);
-  }
-
-  seatArea.appendChild(seatGrid);
+  // 초기화
+  initScene();
+  createClassroom(rows, cols, seatData, myIndex);
 }
 
-// 🔁 연도 비교 기능
-function compareYears() {
-  const year1 = document.getElementById('year1').value;
-  const year2 = document.getElementById('year2').value;
+function initScene() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 1000);
+  renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById('canvas-container').innerHTML = '';
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-  const data1 = JSON.parse(localStorage.getItem(`seatData_${year1}`) || '[]');
-  const data2 = JSON.parse(localStorage.getItem(`seatData_${year2}`) || '[]');
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enablePan = false;
+  controls.maxPolarAngle = Math.PI / 2.5;
+  controls.minDistance = 150;
+  controls.maxDistance = 500;
 
-  const compareArea = document.getElementById('compareArea');
-  compareArea.innerHTML = '';
+  const light = new THREE.AmbientLight(0xffffff, 1);
+  scene.add(light);
 
-  [ [year1, data1], [year2, data2] ].forEach(([year, data]) => {
-    const box = document.createElement('div');
-    box.className = 'compare-box';
-    const title = document.createElement('h4');
-    title.innerText = `${year}년`;
-    box.appendChild(title);
-
-    const grid = document.createElement('div');
-    grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
-    grid.style.gap = '6px';
-
-    for (let i = 0; i < data.length; i++) {
-      const d = data[i];
-      const seat = document.createElement('div');
-      seat.className = 'seat';
-      if (d) {
-        if (d.photo) {
-          const img = document.createElement('img');
-          img.src = d.photo;
-          seat.appendChild(img);
-        }
-        const name = document.createElement('div');
-        name.innerText = d.name;
-        name.style.fontWeight = 'bold';
-        seat.appendChild(name);
-
-        const memo = document.createElement('div');
-        memo.innerText = d.memo;
-        seat.appendChild(memo);
-
-        if (d.name === '나') {
-          seat.style.backgroundColor = '#d1eaff';
-          seat.style.border = '2px solid #2196F3';
-        }
-      } else {
-        seat.innerText = `자리 ${i + 1}`;
-      }
-
-      grid.appendChild(seat);
-    }
-
-    box.appendChild(grid);
-    compareArea.appendChild(box);
-  });
+  animate();
 }
 
-// 📷 QR코드 생성
-function generateQRCode() {
-  const year = document.getElementById('year').value;
-  if (!year) {
-    alert("먼저 저장된 연도를 입력하세요!");
-    return;
+function createClassroom(rows, cols, seatData, myIndex) {
+  const spacingX = 100, spacingY = 80;
+  const offsetX = -((cols-1)*spacingX)/2;
+  const offsetY = ((rows-1)*spacingY)/2;
+
+  for (let i = 0; i < seatData.length; i++) {
+    const data = seatData[i];
+    if (!data) continue;
+
+    const group = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(deskSize.w, deskSize.h, 10);
+    const material = new THREE.MeshBasicMaterial({color: (data.name === '나') ? 0x99ccff : 0xdddddd});
+    const desk = new THREE.Mesh(geometry, material);
+    group.add(desk);
+
+    // 사진
+    if (data.photo) {
+      const texture = new THREE.TextureLoader().load(data.photo);
+      const photoGeo = new THREE.PlaneGeometry(60, 60);
+      const photoMat = new THREE.MeshBasicMaterial({map: texture, transparent: true});
+      const photoMesh = new THREE.Mesh(photoGeo, photoMat);
+      photoMesh.position.set(0, 30, 5);
+      group.add(photoMesh);
+    }
+
+    // 이름
+    const nameCanvas = document.createElement('canvas');
+    nameCanvas.width = 256;
+    nameCanvas.height = 64;
+    const ctx = nameCanvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(data.name, 128, 40);
+    const nameTexture = new THREE.CanvasTexture(nameCanvas);
+    const nameMat = new THREE.MeshBasicMaterial({map: nameTexture, transparent: true});
+    const namePlane = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), nameMat);
+    namePlane.position.set(0, 60, 5);
+    group.add(namePlane);
+
+    // 메모
+    if (data.memo) {
+      const memoCanvas = document.createElement('canvas');
+      memoCanvas.width = 256;
+      memoCanvas.height = 64;
+      const mctx = memoCanvas.getContext('2d');
+      mctx.fillStyle = '#333';
+      mctx.font = '14px Arial';
+      mctx.textAlign = 'center';
+      mctx.fillText(data.memo, 128, 40);
+      const memoTexture = new THREE.CanvasTexture(memoCanvas);
+      const memoMat = new THREE.MeshBasicMaterial({map: memoTexture, transparent: true});
+      const memoPlane = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), memoMat);
+      memoPlane.position.set(0, 45, 5);
+      group.add(memoPlane);
+    }
+
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    group.position.set(offsetX + col * spacingX, 0, offsetY - row * spacingY);
+    scene.add(group);
+
+    desks.push(group);
   }
 
-  const data = localStorage.getItem(`seatData_${year}`);
-  if (!data) {
-    alert(`${year}년 자리 정보가 없습니다.`);
-    return;
+  // 카메라 위치 (내 자리 기준)
+  if (myIndex >= 0 && myIndex < desks.length) {
+    const pos = desks[myIndex].position;
+    camera.position.set(pos.x, 200, pos.z + 200);
+    controls.target.set(pos.x, 0, pos.z);
+  } else {
+    camera.position.set(0, 200, 300);
+    controls.target.set(0, 0, 0);
   }
+  controls.update();
+}
 
-  const qrcodeContainer = document.getElementById("qrcode");
-  qrcodeContainer.innerHTML = '';
-  new QRCode(qrcodeContainer, {
-    text: data,
-    width: 256,
-    height: 256
-  });
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
 }
 </script>
 </body>
