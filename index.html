@@ -263,6 +263,8 @@ function saveSeatLayout() {
     return;
   }
   localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
+  localStorage.setItem(`layout_rows_${year}`, document.getElementById('rows').value);
+  localStorage.setItem(`layout_cols_${year}`, document.getElementById('cols').value);
   alert(`"${year}"년 자리배치 저장 완료!`);
 }
 
