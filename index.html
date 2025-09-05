@@ -2,13 +2,19 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>자리 등록 - 너의 이름은...</title>
+  <title>너의 이름은...</title>
   <style>
     body {
       font-family: 'Arial', sans-serif;
       padding: 20px;
       background-color: #f5f5f5;
     }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
     .container {
       max-width: 800px;
       margin: 0 auto;
@@ -17,111 +23,189 @@
       border-radius: 12px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-    label {
-      font-weight: bold;
-    }
-    .step {
-      font-size: 13px;
-      color: #777;
-      margin-bottom: 4px;
-    }
+
     input, button {
       width: 100%;
       padding: 10px;
-      margin-bottom: 12px;
+      margin-top: 10px;
       font-size: 16px;
       box-sizing: border-box;
     }
+
     button {
       background-color: #4CAF50;
       color: white;
       border: none;
-      border-radius: 6px;
       cursor: pointer;
+      border-radius: 6px;
     }
+
     button:hover {
       background-color: #45a049;
     }
+
     .seat {
       border: 1px solid #ccc;
       border-radius: 6px;
-      padding: 10px;
+      padding: 12px;
       text-align: center;
       background-color: #fafafa;
       cursor: pointer;
+      word-wrap: break-word;
     }
-    #seatArea {
+
+    #seatArea, #compareArea {
       margin-top: 20px;
     }
-    #seatArea img {
+
+    #seatArea img, .seat img {
       max-width: 100%;
       height: auto;
       border-radius: 4px;
       margin-bottom: 4px;
     }
+
+    #popup {
+      display: none;
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -30%);
+      background: white;
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      z-index: 10;
+    }
+
+    .compare-grid {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .compare-box {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .qr-area {
+      margin-top: 30px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+
 <div class="container">
-  <h1>🪑 자리 정보 입력</h1>
+  <h1>너의 이름은...</h1>
 
-  <div class="step">1. 연도 입력 (예: 2025)</div>
-  <input type="text" id="year" placeholder="예: 2025">
+  <!-- 기본 정보 -->
+  <label for="year">년도 입력:</label>
+  <input type="text" id="year" placeholder="예: 2021" />
 
-  <div class="step">2. 내 이름 입력 (자리 강조용)</div>
-  <input type="text" id="myName" placeholder="예: 홍길동">
+  <label for="myName">내 이름 입력:</label>
+  <input type="text" id="myName" placeholder="예: 홍길동" />
 
-  <div class="step">3. 가로 × 세로 자리 수 설정</div>
-  <input type="number" id="cols" placeholder="가로 (예: 6)">
-  <input type="number" id="rows" placeholder="세로 (예: 4)">
+  <button onclick="saveUserData()">이름 저장</button>
+  <button onclick="loadUserData()">이름 불러오기</button>
+
+  <hr style="margin: 20px 0;" />
+
+  <!-- 자리 배치 -->
+  <label for="cols">가로 칸 수 (열):</label>
+  <input type="number" id="cols" placeholder="예: 5" />
+
+  <label for="rows">세로 칸 수 (행):</label>
+  <input type="number" id="rows" placeholder="예: 4" />
+
   <button onclick="generateSeats()">자리 만들기</button>
+  <button onclick="saveSeatLayout()">자리배치 저장</button>
+  <button onclick="loadSeatLayout()">자리배치 불러오기</button>
 
-  <div class="step">4. 각 자리를 클릭해 정보 입력</div>
   <div id="seatArea"></div>
 
-  <div class="step">5. 저장 및 불러오기</div>
-  <button onclick="saveData()">자리 저장</button>
-  <button onclick="loadData()">자리 불러오기</button>
+  <hr style="margin: 30px 0;" />
+
+  <!-- 다년간 비교 -->
+  <h3>📆 다년간 비교 모드</h3>
+  <label for="year1">첫 번째 연도:</label>
+  <input type="text" id="year1" placeholder="예: 2021" />
+  <label for="year2">두 번째 연도:</label>
+  <input type="text" id="year2" placeholder="예: 2022" />
+  <button onclick="compareYears()">비교하기</button>
+
+  <div id="compareArea" class="compare-grid"></div>
+
+  <hr style="margin: 30px 0;" />
+
+  <!-- QR 코드 생성 -->
+  <h3>🔗 QR코드로 자리 공유하기</h3>
+  <button onclick="generateQRCode()">QR코드 생성</button>
+  <div id="qrcode" class="qr-area"></div>
 </div>
 
-<div id="popup" style="display:none; position:fixed; top:30%; left:50%; transform:translateX(-50%); background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.3);">
+<!-- 입력 팝업 -->
+<div id="popup">
   <h3>자리 정보 입력</h3>
-  <input type="text" id="popupName" placeholder="이름">
-  <input type="text" id="popupMemo" placeholder="메모">
-  <input type="file" id="popupPhoto" accept="image/*">
+  <label>이름: <input type="text" id="popupName" /></label><br><br>
+  <label>메모: <input type="text" id="popupMemo" /></label><br><br>
+  <label>사진: <input type="file" id="popupPhoto" accept="image/*" /></label><br><br>
   <button onclick="saveSeatData()">저장</button>
   <button onclick="closePopup()">닫기</button>
 </div>
+<button onclick="window.location.href='classroom3d.html'">
+  3D 보기 실행
+</button>
 
+<!-- QR 코드 라이브러리 (qrcodejs) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
 <script>
 let selectedSeat = null;
 let seatData = [];
 
-function generateSeats() {
-  const cols = parseInt(document.getElementById('cols').value);
-  const rows = parseInt(document.getElementById('rows').value);
-  const seatArea = document.getElementById('seatArea');
-  seatArea.innerHTML = '';
-  seatData = new Array(rows * cols).fill(null);
+function saveUserData() {
+  localStorage.setItem('savedYear', document.getElementById('year').value);
+  localStorage.setItem('savedName', document.getElementById('myName').value);
+  alert('이름 저장 완료!');
+}
 
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  grid.style.gap = '8px';
+function loadUserData() {
+  document.getElementById('year').value = localStorage.getItem('savedYear') || '';
+  document.getElementById('myName').value = localStorage.getItem('savedName') || '';
+  alert('이름 불러오기 완료!');
+}
+
+function generateSeats() {
+  const rows = parseInt(document.getElementById('rows').value);
+  const cols = parseInt(document.getElementById('cols').value);
+  const seatArea = document.getElementById('seatArea');
+
+  if (!rows || !cols || rows <= 0 || cols <= 0) {
+    alert("행과 열을 올바르게 입력하세요.");
+    return;
+  }
+
+  seatData = new Array(rows * cols).fill(null);
+  seatArea.innerHTML = '';
+
+  const seatGrid = document.createElement('div');
+  seatGrid.style.display = 'grid';
+  seatGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  seatGrid.style.gap = '8px';
 
   for (let i = 0; i < rows * cols; i++) {
     const seat = document.createElement('div');
     seat.className = 'seat';
-    seat.innerText = `자리 ${i + 1}`;
     seat.dataset.index = i;
+    seat.innerText = `자리 ${i + 1}`;
     seat.onclick = () => openPopup(seat);
-    grid.appendChild(seat);
+    seatGrid.appendChild(seat);
   }
-  seatArea.appendChild(grid);
+
+  seatArea.appendChild(seatGrid);
 }
 
 function openPopup(seat) {
@@ -140,74 +224,187 @@ function saveSeatData() {
   const name = document.getElementById('popupName').value;
   const memo = document.getElementById('popupMemo').value;
   const photoInput = document.getElementById('popupPhoto');
+  const photoFile = photoInput.files[0];
   const index = selectedSeat.dataset.index;
 
-  const reader = new FileReader();
-  const updateSeat = (photo) => {
-    selectedSeat.innerHTML = '';
-    if (photo) {
+  selectedSeat.innerHTML = '';
+
+  if (photoFile) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
       const img = document.createElement('img');
-      img.src = photo;
+      img.src = e.target.result;
       selectedSeat.appendChild(img);
-    }
-    const nameDiv = document.createElement('div');
-    nameDiv.innerText = name;
-    nameDiv.style.fontWeight = 'bold';
-    selectedSeat.appendChild(nameDiv);
-
-    const memoDiv = document.createElement('div');
-    memoDiv.innerText = memo;
-    selectedSeat.appendChild(memoDiv);
-
-    seatData[index] = { name, memo, photo };
-    closePopup();
-  };
-
-  if (photoInput.files[0]) {
-    reader.onload = (e) => updateSeat(e.target.result);
-    reader.readAsDataURL(photoInput.files[0]);
+      seatData[index] = { name, memo, photo: img.src };
+    };
+    reader.readAsDataURL(photoFile);
   } else {
-    updateSeat(null);
+    seatData[index] = { name, memo, photo: null };
   }
+
+  const nameDiv = document.createElement('div');
+  nameDiv.innerText = name;
+  nameDiv.style.fontWeight = 'bold';
+  selectedSeat.appendChild(nameDiv);
+
+  const memoDiv = document.createElement('div');
+  memoDiv.innerText = memo;
+  selectedSeat.appendChild(memoDiv);
+
+  if (name.trim() === '나') {
+    selectedSeat.style.backgroundColor = '#d1eaff';
+    selectedSeat.style.border = '2px solid #2196F3';
+  }
+
+  closePopup();
 }
 
-function saveData() {
+function saveSeatLayout() {
   const year = document.getElementById('year').value;
-  localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
-  alert(`${year}년 저장 완료`);
-}
-
-function loadData() {
-  const year = document.getElementById('year').value;
-  const raw = localStorage.getItem(`seatData_${year}`);
-  if (!raw) {
-    alert(`${year}년 데이터가 없습니다.`);
+  if (!year) {
+    alert("년도 입력이 필요합니다.");
     return;
   }
-  seatData = JSON.parse(raw);
+  localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
+  alert(`"${year}"년 자리배치 저장 완료!`);
+}
+
+function loadSeatLayout() {
+  const year = document.getElementById('year').value;
+  const saved = localStorage.getItem(`seatData_${year}`);
+  if (!saved) {
+    alert(`"${year}"년 데이터가 없습니다.`);
+    return;
+  }
+
+  const parsed = JSON.parse(saved);
+  seatData = parsed;
+  const seatArea = document.getElementById('seatArea');
   const cols = parseInt(document.getElementById('cols').value);
-  const total = seatData.length;
+  const total = parsed.length;
   const rows = Math.ceil(total / cols);
-  document.getElementById('rows').value = rows;
-  generateSeats();
 
-  const seats = document.querySelectorAll('.seat');
-  seatData.forEach((d, i) => {
-    if (!d || !seats[i]) return;
-    seats[i].innerHTML = '';
-    if (d.photo) {
-      const img = document.createElement('img');
-      img.src = d.photo;
-      seats[i].appendChild(img);
+  seatArea.innerHTML = '';
+  const seatGrid = document.createElement('div');
+  seatGrid.style.display = 'grid';
+  seatGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  seatGrid.style.gap = '8px';
+
+  for (let i = 0; i < total; i++) {
+    const seat = document.createElement('div');
+    seat.className = 'seat';
+    seat.dataset.index = i;
+
+    const data = parsed[i];
+    if (data) {
+      if (data.photo) {
+        const img = document.createElement('img');
+        img.src = data.photo;
+        seat.appendChild(img);
+      }
+
+      const nameDiv = document.createElement('div');
+      nameDiv.innerText = data.name;
+      nameDiv.style.fontWeight = 'bold';
+      seat.appendChild(nameDiv);
+
+      const memoDiv = document.createElement('div');
+      memoDiv.innerText = data.memo;
+      seat.appendChild(memoDiv);
+
+      if (data.name.trim() === '나') {
+        seat.style.backgroundColor = '#d1eaff';
+        seat.style.border = '2px solid #2196F3';
+      }
+    } else {
+      seat.innerText = `자리 ${i + 1}`;
     }
-    const nameDiv = document.createElement('div');
-    nameDiv.innerText = d.name;
-    nameDiv.style.fontWeight = 'bold';
-    seats[i].appendChild(nameDiv);
 
-    const memoDiv = document.createElement('div');
-    memoDiv.innerText = d.memo;
-    seats[i].appendChild(memoDiv);
+    seat.onclick = () => openPopup(seat);
+    seatGrid.appendChild(seat);
+  }
+
+  seatArea.appendChild(seatGrid);
+}
+
+// 🔁 연도 비교 기능
+function compareYears() {
+  const year1 = document.getElementById('year1').value;
+  const year2 = document.getElementById('year2').value;
+
+  const data1 = JSON.parse(localStorage.getItem(`seatData_${year1}`) || '[]');
+  const data2 = JSON.parse(localStorage.getItem(`seatData_${year2}`) || '[]');
+
+  const compareArea = document.getElementById('compareArea');
+  compareArea.innerHTML = '';
+
+  [ [year1, data1], [year2, data2] ].forEach(([year, data]) => {
+    const box = document.createElement('div');
+    box.className = 'compare-box';
+    const title = document.createElement('h4');
+    title.innerText = `${year}년`;
+    box.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+    grid.style.gap = '6px';
+
+    for (let i = 0; i < data.length; i++) {
+      const d = data[i];
+      const seat = document.createElement('div');
+      seat.className = 'seat';
+      if (d) {
+        if (d.photo) {
+          const img = document.createElement('img');
+          img.src = d.photo;
+          seat.appendChild(img);
+        }
+        const name = document.createElement('div');
+        name.innerText = d.name;
+        name.style.fontWeight = 'bold';
+        seat.appendChild(name);
+
+        const memo = document.createElement('div');
+        memo.innerText = d.memo;
+        seat.appendChild(memo);
+
+        if (d.name === '나') {
+          seat.style.backgroundColor = '#d1eaff';
+          seat.style.border = '2px solid #2196F3';
+        }
+      } else {
+        seat.innerText = `자리 ${i + 1}`;
+      }
+
+      grid.appendChild(seat);
+    }
+
+    box.appendChild(grid);
+    compareArea.appendChild(box);
+  });
+}
+
+// 📷 QR코드 생성
+function generateQRCode() {
+  const year = document.getElementById('year').value;
+  if (!year) {
+    alert("먼저 저장된 연도를 입력하세요!");
+    return;
+  }
+
+  const data = localStorage.getItem(`seatData_${year}`);
+  if (!data) {
+    alert(`${year}년 자리 정보가 없습니다.`);
+    return;
+  }
+
+  const qrcodeContainer = document.getElementById("qrcode");
+  qrcodeContainer.innerHTML = '';
+  new QRCode(qrcodeContainer, {
+    text: data,
+    width: 256,
+    height: 256
   });
 }
 </script>
