@@ -52,9 +52,56 @@
 
     <button onclick="saveData()">저장</button>
     <button onclick="loadData()">불러오기</button>
+	  
+	    <hr style="margin: 20px 0;" />
+
+    <label for="cols">가로 칸 수 (열):</label>
+    <input type="number" id="cols" placeholder="예: 5" />
+
+    <label for="rows">세로 칸 수 (행):</label>
+    <input type="number" id="rows" placeholder="예: 4" />
+
+    <button onclick="generateSeats()">자리 만들기</button>
+
+    <div id="seatArea" style="margin-top: 20px;"></div>
+
   </div>
 
   <script>
+	      function generateSeats() {
+      const rows = parseInt(document.getElementById('rows').value);
+      const cols = parseInt(document.getElementById('cols').value);
+      const seatArea = document.getElementById('seatArea');
+
+      if (!rows || !cols || rows <= 0 || cols <= 0) {
+        alert("행과 열을 올바르게 입력하세요.");
+        return;
+      }
+
+      // 자리 초기화
+      seatArea.innerHTML = '';
+
+      // 격자 스타일 설정
+      const seatGrid = document.createElement('div');
+      seatGrid.style.display = 'grid';
+      seatGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      seatGrid.style.gap = '8px';
+
+      // 자리 박스 생성
+      for (let i = 0; i < rows * cols; i++) {
+        const seat = document.createElement('div');
+        seat.style.border = '1px solid #ccc';
+        seat.style.borderRadius = '6px';
+        seat.style.padding = '20px';
+        seat.style.textAlign = 'center';
+        seat.style.backgroundColor = '#fafafa';
+        seat.innerText = `자리 ${i + 1}`;
+        seatGrid.appendChild(seat);
+      }
+
+      seatArea.appendChild(seatGrid);
+    }
+
     function saveData() {
       const year = document.getElementById('year').value;
       const name = document.getElementById('myName').value;
