@@ -5,7 +5,24 @@
   <title>너의 이름은 - 교실 3D 뷰</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#111; }
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#111;}
+    #ui {
+      position: fixed; left: 12px; top: 12px; z-index: 10; color:#fff; font-family: system-ui, Arial, sans-serif;
+      display:flex; flex-direction: column; gap:8px; width:min(92vw, 360px);
+    }
+    #ui .panel {
+      background: rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15);
+      border-radius: 12px; padding: 12px; backdrop-filter: blur(6px);
+    }
+    #ui label { font-size:14px; opacity:0.9; display:block; margin-bottom:4px;}
+    #ui input, #ui button, #ui select {
+      width:100%; padding:10px 12px; border-radius:10px; border:none; outline:none; font-size:14px;
+    }
+    #ui button { background:#4CAF50; color:#fff; cursor:pointer;}
+    #ui button.secondary { background:#2d2d2d; }
+    #hint { position: fixed; bottom: 12px; left: 12px; right:12px; color:#ddd; font-size:12px; text-align:center; opacity:0.8;}
+    canvas { display:block; }
+
     #popup {
       position: fixed;
       top: 50%; left: 50%;
@@ -16,6 +33,7 @@
       display: none;
       z-index: 100;
     }
+
     #popup img {
       max-width: 90vw;
       max-height: 80vh;
@@ -23,40 +41,77 @@
   </style>
 </head>
 <body>
+
+<!-- UI -->
+<div id="ui">
+  <div class="panel">
+    <label>사용할 연도:</label>
+    <input id="year" placeholder="예: 2025" />
+    <button id="applyYear">불러오기</button>
+  </div>
+  <div class="panel">
+    <label>격자 크기 (행 x 열):</label>
+    <div style="display:flex; gap:8px;">
+      <input id="rows" type="number" placeholder="행(예:4)" />
+      <input id="cols" type="number" placeholder="열(예:6)" />
+    </div>
+    <button class="secondary" id="regen">교실 다시 만들기</button>
+  </div>
+  <div class="panel">
+    <button id="sensor">📱 센서 시작</button>
+    <button class="secondary" id="centerBoard">🔄 칠판 보기</button>
+  </div>
+</div>
+
+<div id="hint">기기를 좌우로 돌리면 회전, 터치로 아래로 쓸면 전진, 위로 쓸면 후진<br/>"나" 자리가 없으면 중앙에서 시작</div>
 <div id="popup"><img id="popupImg" src=""></div>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script>
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x101014);
+
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 2000);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// 조명
 scene.add(new THREE.HemisphereLight(0xffffff, 0x202028, 0.8));
 const dir = new THREE.DirectionalLight(0xffffff, 0.9);
 dir.position.set(10, 20, 10);
 scene.add(dir);
 
+// 교실
 const classroom = new THREE.Group();
 scene.add(classroom);
 
+// 바닥
 const FLOOR_W = 72, FLOOR_H = 48;
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(FLOOR_W, FLOOR_H),
-  new THREE.MeshStandardMaterial({ color:0x2a2a32 })
+  new THREE.MeshStandardMaterial({ color:0x2a2a32, roughness:1.0 })
 );
 floor.rotation.x = -Math.PI/2;
 classroom.add(floor);
 
+// 칠판
+const boardW = 24, boardH = 6;
+const BOARD_Z = - (FLOOR_H / 2) + 2;
 const board = new THREE.Mesh(
-  new THREE.PlaneGeometry(24, 6),
+  new THREE.PlaneGeometry(boardW, boardH),
   new THREE.MeshStandardMaterial({ color:0x0f9d58 })
 );
-const BOARD_Z = -(FLOOR_H/2) + 2;
 board.position.set(0, 6, BOARD_Z);
 classroom.add(board);
 
+// 책상 데이터
+let rows = 4, cols = 6;
+const desk = { w: 5, h: 3, y: 1.2, gapX: 1.2, gapZ: 2.0 };
+let desks = [];
+
+// 📷 팝업
 function showImagePopup(src) {
   const popup = document.getElementById('popup');
   const img = document.getElementById('popupImg');
@@ -67,62 +122,166 @@ document.getElementById('popup').onclick = () => {
   document.getElementById('popup').style.display = 'none';
 };
 
+// 저장된 seatData 불러오기
+function loadSaved() {
+  const year = (document.getElementById('year').value || localStorage.getItem('savedYear') || '').trim();
+  if (year) document.getElementById('year').value = year;
+  const raw = year ? localStorage.getItem(`seatData_${year}`) : null;
+  const seatData = raw ? JSON.parse(raw) : [];
+
+  const metaRows = parseInt(localStorage.getItem(`layout_rows_${year}`) || '') || parseInt(document.getElementById('rows').value || '') || rows;
+  const metaCols = parseInt(localStorage.getItem(`layout_cols_${year}`) || '') || parseInt(document.getElementById('cols').value || '') || cols;
+
+  rows = metaRows > 0 ? metaRows : rows;
+  cols = metaCols > 0 ? metaCols : cols;
+
+  document.getElementById('rows').value = rows;
+  document.getElementById('cols').value = cols;
+
+  return { year, seatData };
+}
+
+// 교실 다시 만들기
+function rebuildClassroom() {
+  desks.forEach(d => {
+    classroom.remove(d.mesh);
+    if (d.card) classroom.remove(d.card);
+  });
+  desks = [];
+
+  const { seatData } = loadSaved();
+  const total = Math.max(seatData.length || 0, rows*cols);
+  const totalW = cols*desk.w + (cols-1)*desk.gapX;
+  const totalH = rows*desk.h + (rows-1)*desk.gapZ;
+  const startX = -totalW/2 + desk.w/2;
+  const startZ = -totalH/2 + desk.h/2;
+
+  for (let i=0; i<rows; i++) {
+    for (let j=0; j<cols; j++) {
+      const idx = i*cols + j;
+      if (idx >= total) break;
+
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(desk.w, 2.2, desk.h),
+        new THREE.MeshStandardMaterial({ color:0x7aa5ff })
+      );
+      mesh.position.set(startX + j*(desk.w + desk.gapX), 1.1, startZ + i*(desk.h + desk.gapZ));
+      classroom.add(mesh);
+
+      const d = seatData[idx] || null;
+      let card = null;
+      if (d && (d.name || d.memo || d.photo)) {
+        card = makeDeskCard(d, mesh.position);
+        classroom.add(card);
+      }
+
+      desks.push({ mesh, card, data: d, index: idx, rc:{r:i,c:j} });
+    }
+  }
+}
+
+// 카드 만들기
 function makeDeskCard(d, basePos) {
   const group = new THREE.Group();
 
   if (d.photo) {
     const tex = new THREE.TextureLoader().load(d.photo);
-    const imgW = 3.2, imgH = 2.2;
     const photo = new THREE.Mesh(
-      new THREE.PlaneGeometry(imgW, imgH),
-      new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0, side: THREE.DoubleSide })
+      new THREE.PlaneGeometry(3.2, 2.2),
+      new THREE.MeshStandardMaterial({ map: tex, roughness:1, metalness:0, side:THREE.DoubleSide })
     );
     photo.position.set(basePos.x, basePos.y + 2.0, basePos.z);
+    photo.cursor = 'pointer';
     photo.callback = () => showImagePopup(d.photo);
     group.add(photo);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.fillText(d.name || '(빈자리)', canvas.width / 2, 70);
-    ctx.font = '20px sans-serif';
-    ctx.fillText(d.memo || '', canvas.width / 2, 110);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
-    sprite.scale.set(3.2, 2.2, 1);
-    sprite.position.set(basePos.x, basePos.y + 2.0, basePos.z + 0.01);
-    group.add(sprite);
   }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,256,64);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 80px sans-serif';
+  ctx.fillText(d.name || '(빈자리)', 10, 22);
+  ctx.font = '30px sans-serif';
+  ctx.fillText(d.memo || '', 10, 42);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const labelMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const label = new THREE.Sprite(labelMat);
+  label.scale.set(4, 1, 1);
+  label.position.set(basePos.x, basePos.y + 1, basePos.z);
+  group.add(label);
 
   return group;
 }
 
-const sampleData = [{ name: '이름', memo: '메모는 작게', photo: 'https://i.imgur.com/CzXTtJV.png' }];
-const deskW = 5, deskH = 3;
-const desk = new THREE.Mesh(
-  new THREE.BoxGeometry(deskW, 2.2, deskH),
-  new THREE.MeshStandardMaterial({ color:0x7aa5ff })
-);
-desk.position.set(0, 1.1, 0);
-classroom.add(desk);
-const card = makeDeskCard(sampleData[0], desk.position);
-classroom.add(card);
+// 카메라 나자리 기준
+function placeCameraAtMySeat() {
+  const { seatData } = loadSaved();
+  const myIndex = (seatData || []).findIndex(d => d && d.name && d.name.trim() === '나');
 
-camera.position.set(0, 18, 26);
-camera.lookAt(0, 5, 0);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-function animate() {
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera);
+  const totalW = cols*desk.w + (cols-1)*desk.gapX;
+  const totalH = rows*desk.h + (rows-1)*desk.gapZ;
+  const startX = -totalW/2 + desk.w/2;
+  const startZ = -totalH/2 + desk.h/2;
+
+  let camX = 0, camY = 18, camZ = 26;
+  if (myIndex >= 0) {
+    const r = Math.floor(myIndex / cols);
+    const c = myIndex % cols;
+    const myX = startX + c*(desk.w + desk.gapX);
+    const myZ = startZ + r*(desk.h + desk.gapZ);
+    camX = myX;
+    camZ = myZ + 24;
+  }
+  camera.position.set(camX, camY, camZ);
+  camera.lookAt(new THREE.Vector3(0, 5, BOARD_Z));
 }
-animate();
+
+// UI 이벤트
+document.getElementById('applyYear').onclick = () => { rebuildClassroom(); placeCameraAtMySeat(); };
+document.getElementById('regen').onclick = () => { rows = +document.getElementById('rows').value; cols = +document.getElementById('cols').value; rebuildClassroom(); placeCameraAtMySeat(); };
+document.getElementById('centerBoard').onclick = () => { camera.position.set(0,18,26); camera.lookAt(new THREE.Vector3(0,5,BOARD_Z)); };
+
+// 센서
+let baseAlpha = null;
+function handleOrientation(e) {
+  if (typeof e.alpha !== 'number') return;
+  if (baseAlpha === null) baseAlpha = e.alpha;
+  const yaw = THREE.MathUtils.degToRad(baseAlpha - e.alpha);  // ↔ 반전 적용됨
+  classroom.rotation.y = yaw;
+}
+document.getElementById('sensor').onclick = async () => {
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    const p = await DeviceOrientationEvent.requestPermission();
+    if (p !== 'granted') return alert('센서 권한 거부됨');
+  }
+  window.addEventListener('deviceorientation', handleOrientation, true);
+};
+
+// 터치 이동
+let touchStartY = null, accumZ = 0;
+window.addEventListener('touchstart', e => { if (e.touches.length === 1) touchStartY = e.touches[0].clientY; }, {passive:true});
+window.addEventListener('touchmove', e => {
+  if (touchStartY === null || e.touches.length !== 1) return;
+  const dy = e.touches[0].clientY - touchStartY;
+  accumZ = THREE.MathUtils.clamp(accumZ - dy*0.04, -60, 60);
+  classroom.position.z = accumZ;
+  touchStartY = e.touches[0].clientY;
+}, {passive:true});
+window.addEventListener('touchend', () => touchStartY = null);
+
+// 초기 실행
+rebuildClassroom();
+placeCameraAtMySeat();
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+(function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); })();
 </script>
 </body>
 </html>
