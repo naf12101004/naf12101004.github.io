@@ -203,41 +203,84 @@
       return sprite;
     }
 
-    // ====== 책상 카드(사진 + 텍스트) ======
-    function makeDeskCard(d, basePos) {
-      const group = new THREE.Group();
-      // 사진
-      if (d.photo) {
-        const tex = new THREE.TextureLoader().load(d.photo);
-        const imgW = 3.2, imgH = 2.2;
-        const photo = new THREE.Mesh(
-          new THREE.PlaneGeometry(imgW, imgH),
-          new THREE.MeshStandardMaterial({ map: tex, roughness:1, metalness:0, side:THREE.DoubleSide })
-        );
-        photo.position.set(basePos.x, basePos.y + 2.0, basePos.z);
-        photo.rotation.y = 0;
-        group.add(photo);
+    // ====== 책상 카드(사진 + 텍스트) 수정됨 ======
+function makeDeskCard(d, basePos) {
+  const group = new THREE.Group();
 
-        // 액자 느낌의 받침(간단 박스)
-        const stand = new THREE.Mesh(
-          new THREE.BoxGeometry(imgW+0.2, 0.1, 0.4),
-          new THREE.MeshStandardMaterial({ color:0x333333 })
-        );
-        stand.position.set(basePos.x, basePos.y + 1.0, basePos.z - 0.2);
-        group.add(stand);
-      }
-      // 이름/메모 라벨
-      const nameText = (d.name || '').trim();
-      const memoText = (d.memo || '').trim();
-      const label = makeTextSprite(
-        (nameText ? nameText : '(빈자리)') + (memoText ? ` · ${memoText}` : ''),
-        {x: basePos.x, y: basePos.y + 3.1, z: basePos.z},
-        {font:'600 32px system-ui, Arial', scale:0.05}
-      );
-      group.add(label);
+  // 사진
+  if (d.photo) {
+    const tex = new THREE.TextureLoader().load(d.photo);
+    const imgW = 3.2, imgH = 2.2;
+    const photo = new THREE.Mesh(
+      new THREE.PlaneGeometry(imgW, imgH),
+      new THREE.MeshStandardMaterial({ map: tex, roughness:1, metalness:0, side:THREE.DoubleSide })
+    );
+    photo.position.set(basePos.x, basePos.y + 2.0, basePos.z);
+    photo.userData = { fullImage: d.photo };
+    photo.cursor = 'pointer';
 
-      return group;
-    }
+    // 사진 클릭 시 큰 이미지 팝업
+    photo.callback = () => showImagePopup(d.photo);
+    group.add(photo);
+
+    // 액자 받침
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(imgW+0.2, 0.1, 0.4),
+      new THREE.MeshStandardMaterial({ color:0x333333 })
+    );
+    stand.position.set(basePos.x, basePos.y + 1.0, basePos.z - 0.2);
+    group.add(stand);
+  }
+
+  // 이름 및 메모 텍스트 (CSS2DRenderer나 Sprite 대신 투명배경 캔버스 이용)
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 16px sans-serif';
+  ctx.fillText(d.name || '(빈자리)', 10, 20);
+  ctx.font = '12px sans-serif';
+  ctx.fillText(d.memo || '', 10, 40);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const labelMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const label = new THREE.Sprite(labelMat);
+  label.scale.set(4, 1, 1);
+  label.position.set(basePos.x, basePos.y + 3.1, basePos.z);
+  group.add(label);
+
+  return group;
+}
+
+    // ====== 이미지 팝업 기능 추가 ======
+const popup = document.createElement('div');
+popup.style.position = 'fixed';
+popup.style.top = '50%';
+popup.style.left = '50%';
+popup.style.transform = 'translate(-50%, -50%)';
+popup.style.background = 'rgba(0,0,0,0.9)';
+popup.style.padding = '20px';
+popup.style.borderRadius = '12px';
+popup.style.zIndex = '100';
+popup.style.display = 'none';
+popup.style.maxWidth = '90vw';
+popup.style.maxHeight = '90vh';
+
+const popupImg = document.createElement('img');
+popupImg.style.maxWidth = '100%';
+popupImg.style.maxHeight = '100%';
+popup.appendChild(popupImg);
+document.body.appendChild(popup);
+
+popup.onclick = () => popup.style.display = 'none';
+
+function showImagePopup(src) {
+  popupImg.src = src;
+  popup.style.display = 'block';
+}
+
 
     // ====== “나” 자리 기준 카메라 배치 ======
     function placeCameraAtMySeat() {
@@ -290,12 +333,12 @@
     // ====== 센서(기기 회전) — 교실을 회전 ======
     let baseAlpha = null;
     function handleOrientation(e) {
-      // e.alpha: 0~360 (기기 방위)
-      if (typeof e.alpha !== 'number') return;
-      if (baseAlpha === null) baseAlpha = e.alpha;               // 초기 기준
-      const yaw = THREE.MathUtils.degToRad(e.alpha - baseAlpha); // 좌우 회전
-      classroom.rotation.y = yaw;
-    }
+  if (typeof e.alpha !== 'number') return;
+  if (baseAlpha === null) baseAlpha = e.alpha;
+  const yaw = THREE.MathUtils.degToRad(baseAlpha - e.alpha); // 🔄 방향 반전됨
+  classroom.rotation.y = yaw;
+}
+
     async function enableSensor() {
       // iOS 권한 요청
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
