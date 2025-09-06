@@ -263,9 +263,18 @@ function saveSeatLayout() {
     alert("년도 입력이 필요합니다.");
     return;
   }
+
+  // 현재 입력된 행/열 값도 함께 저장
+  const rows = document.getElementById('rows').value;
+  const cols = document.getElementById('cols').value;
+
   localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
+  localStorage.setItem(`layout_rows_${year}`, rows);
+  localStorage.setItem(`layout_cols_${year}`, cols);
+
   alert(`"${year}"년 자리배치 저장 완료!`);
 }
+
 
 function loadSeatLayout() {
   const year = document.getElementById('year').value;
