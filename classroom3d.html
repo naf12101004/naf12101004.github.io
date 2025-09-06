@@ -293,8 +293,9 @@
       // e.alpha: 0~360 (기기 방위)
       if (typeof e.alpha !== 'number') return;
       if (baseAlpha === null) baseAlpha = e.alpha;               // 초기 기준
-      const yaw = THREE.MathUtils.degToRad(e.alpha - baseAlpha); // 좌우 회전
+      const yaw = THREE.MathUtils.degToRad(-(e.alpha - baseAlpha)); // 좌우 반전
       classroom.rotation.y = yaw;
+
     }
     async function enableSensor() {
       // iOS 권한 요청
