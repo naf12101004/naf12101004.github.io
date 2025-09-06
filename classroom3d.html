@@ -216,7 +216,14 @@
         );
         photo.position.set(basePos.x, basePos.y + 2.0, basePos.z);
         photo.rotation.y = 0;
+
+        // ✅ 클릭 이벤트 추가
+        photo.userData = { fullsize: d.photo };
+        photo.cursor = 'pointer';
+        photo.callback = () => showPhotoModal(d.photo);
+
         group.add(photo);
+
 
         // 액자 느낌의 받침(간단 박스)
         const stand = new THREE.Mesh(
@@ -346,9 +353,48 @@
 
     // ====== 루프 ======
     (function animate(){
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
     })();
+
+    // ====== 클릭 감지 ======
+    renderer.domElement.addEventListener('click', function(e) {
+  const mouse = new THREE.Vector2(
+    (e.clientX / window.innerWidth) * 2 - 1,
+    -(e.clientY / window.innerHeight) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(classroom.children, true);
+
+  for (const intersect of intersects) {
+    const obj = intersect.object;
+    if (obj.callback) {
+      obj.callback();
+      break;
+    }
+  }
+});
+
+
+
+    // ====== 사진 클릭 시 확대 팝업 ======
+    function showPhotoModal(url) {
+    document.getElementById("modalImage").src = url;
+    document.getElementById("photoModal").style.display = "flex";
+    }
+    function closePhotoModal() {
+    document.getElementById("photoModal").style.display = "none";
+    }
+
+    
   </script>
+  
+  <!-- 📷 사진 확대용 팝업 -->
+<div id="photoModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:100; justify-content:center; align-items:center;">
+  <img id="modalImage" src="" style="max-width:90vw; max-height:90vh; border:4px solid white; border-radius:12px;" />
+  <button onclick="closePhotoModal()" style="position:absolute; top:20px; right:20px; background:#f44336; color:white; border:none; padding:10px 16px; font-size:16px; border-radius:8px; cursor:pointer;">X</button>
+</div>
+
 </body>
 </html>
