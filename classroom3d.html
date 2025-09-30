@@ -96,11 +96,11 @@
     const classroom = new THREE.Group();
     scene.add(classroom);
 
-    // ====== 바닥 (가장 밝은 회색) ======
+    // ====== 바닥 (아주 밝은 회색) ======
     const FLOOR_W = 72, FLOOR_H = 48;
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(FLOOR_W, FLOOR_H),
-      new THREE.MeshStandardMaterial({ color:0x7B705E, metalness:0.0, roughness:1.0 })
+      new THREE.MeshStandardMaterial({ color:0xEEEEEE, metalness:0.0, roughness:1.0 })
     );
     floor.rotation.x = -Math.PI/2;
     classroom.add(floor);
@@ -115,7 +115,7 @@
     board.position.set(0, 6, BOARD_Z);
     classroom.add(board);
 
-    // ✅ 칠판 라벨: "칠판" (배경 제거, 칠판 중앙, 겹침 방지 overlay)
+    // ✅ 칠판 라벨: "칠판" (배경 제거, 중앙, 겹침 방지 overlay)
     classroom.add(
       makeTextSprite("칠판", {x:0, y:6, z:BOARD_Z+0.01}, { font:'700 40px system-ui, Arial', scale:0.05, bg:false, overlay:true })
     );
@@ -132,6 +132,19 @@
 
       const raw = year ? localStorage.getItem(`seatData_${year}`) : null;
       const seatData = raw ? JSON.parse(raw) : [];
+
+      /* 👉 외부화된 사진 복원($photoKey → dataURL) + 구버전 호환 */
+      if (Array.isArray(seatData)) {
+        seatData.forEach((d) => {
+          if (d && d.photo && d.photo.$photoKey) {
+            const val = localStorage.getItem(d.photo.$photoKey);
+            if (val) d.photo = val;
+          } else if (d && typeof d.photo === 'string' && d.photo.startsWith('seatPhoto_')) {
+            const val = localStorage.getItem(d.photo);
+            if (val) d.photo = val;
+          }
+        });
+      }
 
       const metaRows = parseInt(localStorage.getItem(`layout_rows_${year}`) || '') || parseInt(document.getElementById('rows').value || '') || rows;
       const metaCols = parseInt(localStorage.getItem(`layout_cols_${year}`) || '') || parseInt(document.getElementById('cols').value || '') || cols;
@@ -268,7 +281,7 @@
       const group = new THREE.Group();
 
       // 사진
-      if (d.photo) {
+      if (d && d.photo) {
         const tex = new THREE.TextureLoader().load(d.photo);
         const imgW = 3.2, imgH = 2.2;
         const photo = new THREE.Mesh(
@@ -292,8 +305,8 @@
       }
 
       // 이름/메모 라벨 (배경 제거, 겹침 방지로 위로 올림)
-      const nameText = (d.name || '').trim() || '(빈자리)';
-      const memoText = (d.memo || '').trim();
+      const nameText = (d && d.name ? d.name : '').trim() || '(빈자리)';
+      const memoText = (d && d.memo ? d.memo : '').trim();
 
       const nameLabel = makeTextSprite(
         nameText,
@@ -314,7 +327,7 @@
     }
 
     // ====== 시점(카메라) 모드 ======
-    let cameraMode = 'tp'; // ✅ 기본을 3인칭으로 변경
+    let cameraMode = 'tp'; // 기본 3인칭
 
     // ====== “나” 자리 기준 카메라 배치 ======
     function placeCameraAtMySeat() {
