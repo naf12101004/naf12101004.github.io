@@ -164,6 +164,9 @@
 let selectedSeat = null;
 let seatData = [];
 
+/* =========================
+   사용자 정보 저장/불러오기
+   ========================= */
 function saveUserData() {
   localStorage.setItem('savedYear', document.getElementById('year').value);
   localStorage.setItem('savedName', document.getElementById('myName').value);
@@ -176,6 +179,9 @@ function loadUserData() {
   alert('이름 불러오기 완료!');
 }
 
+/* ==============
+   자리 만들기
+   ============== */
 function generateSeats() {
   const rows = parseInt(document.getElementById('rows').value);
   const cols = parseInt(document.getElementById('cols').value);
@@ -206,6 +212,9 @@ function generateSeats() {
   seatArea.appendChild(seatGrid);
 }
 
+/* ==========
+   팝업
+   ========== */
 function openPopup(seat) {
   selectedSeat = seat;
   document.getElementById('popup').style.display = 'block';
@@ -218,6 +227,9 @@ function closePopup() {
   document.getElementById('popupPhoto').value = '';
 }
 
+/* ======================================
+   좌석 데이터(이름/메모/사진) 입력/표시
+   ====================================== */
 function saveSeatData() {
   const name = document.getElementById('popupName').value;
   const memo = document.getElementById('popupMemo').value;
@@ -231,7 +243,7 @@ function saveSeatData() {
     const reader = new FileReader();
     reader.onload = function (e) {
       const img = document.createElement('img');
-      img.src = e.target.result;
+      img.src = e.target.result; // 원본 dataURL(미리보기)
       selectedSeat.appendChild(img);
       seatData[index] = { name, memo, photo: img.src };
     };
@@ -257,7 +269,103 @@ function saveSeatData() {
   closePopup();
 }
 
-function saveSeatLayout() {
+/* ===========================
+   저장 전: 자동 압축 + 외부화
+   =========================== */
+// dataURL → Image 로드
+function loadImageFromDataURL(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// dataURL 자동 압축 (최대 크기/목표 용량 근접)
+async function compressDataURLAuto(dataUrl, {
+  maxDim = 1280,
+  targetKB = 180,
+  format = 'image/jpeg'
+} = {}) {
+  const img = await loadImageFromDataURL(dataUrl);
+
+  // 1) 크기 축소
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  let w = Math.round(img.width * scale);
+  let h = Math.round(img.height * scale);
+
+  const cvs = document.createElement('canvas');
+  const ctx = cvs.getContext('2d');
+
+  // 2) 품질 이진 탐색으로 targetKB 맞추기
+  let qLow = 0.5, qHigh = 0.9, best = null;
+  for (let iter = 0; iter < 6; iter++) {
+    const q = (qLow + qHigh) / 2;
+    cvs.width = w; cvs.height = h;
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const out = cvs.toDataURL(format, q);
+    const sizeKB = Math.ceil((out.length * 3) / 4 / 1024);
+    if (sizeKB <= targetKB) { best = out; qLow = q; } else { qHigh = q; }
+  }
+  if (best) return best;
+
+  // 3) 아직 크면 추가 축소 + 고정 품질
+  const s2 = 0.85;
+  w = Math.max(320, Math.round(w * s2));
+  h = Math.max(320, Math.round(h * s2));
+  cvs.width = w; cvs.height = h;
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return cvs.toDataURL(format, 0.75);
+}
+
+// seatData 저장 준비: dataURL 압축 + 개별 키 외부화
+async function prepareSeatDataForSave(year, seatData) {
+  const clone = JSON.parse(JSON.stringify(seatData || []));
+  const externals = []; // [{key, value}]
+  for (let i = 0; i < clone.length; i++) {
+    const d = clone[i];
+    if (!d || !d.photo) continue;
+
+    // dataURL만 압축
+    if (typeof d.photo === 'string' && d.photo.startsWith('data:image')) {
+      d.photo = await compressDataURLAuto(d.photo, {
+        maxDim: 1280,
+        targetKB: 180,
+        format: 'image/jpeg'
+      });
+    }
+    // dataURL을 개별 키로 외부화
+    if (typeof d.photo === 'string' && d.photo.startsWith('data:image')) {
+      const key = `seatPhoto_${year}_${i}`;
+      externals.push({ key, value: d.photo });
+      d.photo = { $photoKey: key }; // 본문에는 참조만
+    }
+  }
+  return { data: clone, externals };
+}
+
+// 외부화된 사진 복원($photoKey → dataURL)
+function restorePhotosInSeatArray(arr) {
+  if (!Array.isArray(arr)) return arr;
+  arr.forEach(d => {
+    if (d && d.photo && d.photo.$photoKey) {
+      const val = localStorage.getItem(d.photo.$photoKey);
+      if (val) d.photo = val;
+    } else if (d && typeof d.photo === 'string' && d.photo.startsWith('seatPhoto_')) {
+      const val = localStorage.getItem(d.photo);
+      if (val) d.photo = val;
+    }
+  });
+  return arr;
+}
+
+/* ==========================
+   자리배치 저장 / 불러오기
+   ========================== */
+async function saveSeatLayout() {
   const year = document.getElementById('year').value;
   if (!year) {
     alert("년도 입력이 필요합니다.");
@@ -268,13 +376,26 @@ function saveSeatLayout() {
   const rows = document.getElementById('rows').value;
   const cols = document.getElementById('cols').value;
 
-  localStorage.setItem(`seatData_${year}`, JSON.stringify(seatData));
-  localStorage.setItem(`layout_rows_${year}`, rows);
-  localStorage.setItem(`layout_cols_${year}`, cols);
+  try {
+    // 자동 압축 + 외부화
+    const { data, externals } = await prepareSeatDataForSave(year, seatData);
 
-  alert(`"${year}"년 자리배치 저장 완료!`);
+    // 본문 먼저 저장
+    localStorage.setItem(`seatData_${year}`, JSON.stringify(data));
+    // 개별 이미지 저장
+    for (const {key, value} of externals) {
+      localStorage.setItem(key, value);
+    }
+
+    localStorage.setItem(`layout_rows_${year}`, rows);
+    localStorage.setItem(`layout_cols_${year}`, cols);
+
+    alert(`"${year}"년 자리배치 저장 완료!`);
+  } catch (e) {
+    console.error('자리배치 저장 실패:', e);
+    alert('이미지를 저장하는 중 문제가 발생했습니다. 다시 시도해 주세요.');
+  }
 }
-
 
 function loadSeatLayout() {
   const year = document.getElementById('year').value;
@@ -285,6 +406,9 @@ function loadSeatLayout() {
   }
 
   const parsed = JSON.parse(saved);
+  // 👉 외부화된 사진 복원
+  restorePhotosInSeatArray(parsed);
+
   seatData = parsed;
   const seatArea = document.getElementById('seatArea');
   const cols = parseInt(document.getElementById('cols').value);
@@ -319,7 +443,7 @@ function loadSeatLayout() {
       memoDiv.innerText = data.memo;
       seat.appendChild(memoDiv);
 
-      if (data.name.trim() === '나') {
+      if (data.name && data.name.trim() === '나') {
         seat.style.backgroundColor = '#d1eaff';
         seat.style.border = '2px solid #2196F3';
       }
@@ -334,13 +458,19 @@ function loadSeatLayout() {
   seatArea.appendChild(seatGrid);
 }
 
-// 🔁 연도 비교 기능
+/* ================
+   연도 비교 기능
+   ================ */
 function compareYears() {
   const year1 = document.getElementById('year1').value;
   const year2 = document.getElementById('year2').value;
 
   const data1 = JSON.parse(localStorage.getItem(`seatData_${year1}`) || '[]');
   const data2 = JSON.parse(localStorage.getItem(`seatData_${year2}`) || '[]');
+
+  // 👉 외부화된 사진 복원
+  restorePhotosInSeatArray(data1);
+  restorePhotosInSeatArray(data2);
 
   const compareArea = document.getElementById('compareArea');
   compareArea.innerHTML = '';
@@ -368,12 +498,12 @@ function compareYears() {
           seat.appendChild(img);
         }
         const name = document.createElement('div');
-        name.innerText = d.name;
+        name.innerText = d.name || '';
         name.style.fontWeight = 'bold';
         seat.appendChild(name);
 
         const memo = document.createElement('div');
-        memo.innerText = d.memo;
+        memo.innerText = d.memo || '';
         seat.appendChild(memo);
 
         if (d.name === '나') {
@@ -392,7 +522,9 @@ function compareYears() {
   });
 }
 
-// 📷 QR코드 생성
+/* ================
+   QR코드 생성
+   ================ */
 function generateQRCode() {
   const year = document.getElementById('year').value;
   if (!year) {
@@ -405,6 +537,10 @@ function generateQRCode() {
     alert(`${year}년 자리 정보가 없습니다.`);
     return;
   }
+
+  // 주의: 이미지는 외부 키( seatPhoto_... )로 분리되어 있어,
+  // QR 텍스트에는 실제 이미지 데이터가 포함되지 않습니다.
+  // (classroom3d.html / 이 페이지의 복원 로직이 키를 보고 다시 dataURL로 복원합니다.)
 
   const qrcodeContainer = document.getElementById("qrcode");
   qrcodeContainer.innerHTML = '';
