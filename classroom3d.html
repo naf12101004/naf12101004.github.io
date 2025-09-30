@@ -33,15 +33,6 @@
     </div>
 
     <div class="panel">
-      <label>기본 격자 (행 × 열) — 저장값 없을 때만 사용</label>
-      <div style="display:flex; gap:8px;">
-        <input id="rows" type="number" placeholder="행(예:4)" />
-        <input id="cols" type="number" placeholder="열(예:6)" />
-      </div>
-      <button class="secondary" id="regen">교실 다시 만들기</button>
-    </div>
-
-    <div class="panel">
       <button id="sensor">📱 센서(회전) 시작</button>
       <button class="secondary" id="centerBoard">🔄 칠판 보기</button>
     </div>
@@ -209,7 +200,7 @@
       // 사진
       if (d.photo) {
         const tex = new THREE.TextureLoader().load(d.photo);
-        const imgW = 3.2, imgH = 2.2;
+        const imgW = 5.2, imgH = 7.2;
         const photo = new THREE.Mesh(
           new THREE.PlaneGeometry(imgW, imgH),
           new THREE.MeshStandardMaterial({ map: tex, roughness:1, metalness:0, side:THREE.DoubleSide })
