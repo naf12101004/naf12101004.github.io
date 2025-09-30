@@ -5,25 +5,27 @@
   <title>너의 이름은 - 교실 3D 뷰</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#111;}
+    /* ✅ 전체 배경 흰색으로 변경 */
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#fff;}
     #ui {
-      position: fixed; left: 12px; top: 12px; z-index: 10; color:#fff; font-family: system-ui, Arial, sans-serif;
+      position: fixed; left: 12px; top: 12px; z-index: 10; color:#111; font-family: system-ui, Arial, sans-serif;
       display:flex; flex-direction: column; gap:8px; width:min(92vw, 360px);
     }
     #ui .panel {
-      background: rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.75); border:1px solid rgba(0,0,0,0.1);
       border-radius: 12px; padding: 12px; backdrop-filter: blur(6px);
     }
     #ui label { font-size:14px; opacity:0.9; display:block; margin-bottom:4px;}
     #ui input, #ui button, #ui select {
-      width:100%; padding:10px 12px; border-radius:10px; border:none; outline:none; font-size:14px;
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.15); outline:none; font-size:14px;
+      background:#fff; color:#111;
     }
-    #ui button { background:#4CAF50; color:#fff; cursor:pointer;}
+    #ui button { background:#4CAF50; color:#fff; cursor:pointer; border:none;}
     #ui button.secondary { background:#2d2d2d; }
-    #hint { position: fixed; bottom: 12px; left: 12px; right:12px; color:#ddd; font-size:12px; text-align:center; opacity:0.8;}
+    #hint { position: fixed; bottom: 12px; left: 12px; right:12px; color:#555; font-size:12px; text-align:center; opacity:0.8;}
     canvas { display:block; }
 
-    /* ✅ 기본 격자 패널: 기능은 유지하되 항상 화면에서 숨김 */
+    /* ✅ 기본 격자 패널: 기능 유지, 항상 숨김 */
     #panel-grid { display:none !important; }
 
     /* ===== 모바일 최적화: 너비 640px 이하(폰)에서만 추가 조정 ===== */
@@ -84,7 +86,7 @@
     <div class="panel">
       <button id="sensor">📱 센서(회전) 시작</button>
       <button class="secondary" id="centerBoard">🔄 칠판 보기</button>
-      <!-- ✅ 시점 전환 버튼 추가 -->
+      <!-- 시점 전환 -->
       <div style="display:flex; gap:8px; margin-top:8px;">
         <button id="firstPerson" class="secondary">👁️ 1인칭</button>
         <button id="thirdPerson" class="secondary">🧍 3인칭</button>
@@ -98,7 +100,8 @@
   <script>
     // ====== 기초 세팅 ======
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x101014);
+    /* ✅ 장면 배경 흰색 */
+    scene.background = new THREE.Color(0xffffff);
 
     const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 2000);
     const renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -107,7 +110,7 @@
     document.body.appendChild(renderer.domElement);
 
     // 조명
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x202028, 0.8);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xe0e0e0, 0.85);
     scene.add(hemi);
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
     dir.position.set(10, 20, 10);
@@ -117,27 +120,31 @@
     const classroom = new THREE.Group();
     scene.add(classroom);
 
-    // 바닥
+    // 바닥 (밝은 톤)
     const FLOOR_W = 72, FLOOR_H = 48;
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(FLOOR_W, FLOOR_H),
-      new THREE.MeshStandardMaterial({ color:0x2a2a32, metalness:0.0, roughness:1.0 })
+      new THREE.MeshStandardMaterial({ color:0xf3f3f3, metalness:0.0, roughness:1.0 })
     );
     floor.rotation.x = -Math.PI/2;
     classroom.add(floor);
 
-    // 칠판(앞쪽 벽, 화면 상단 중앙 느낌으로 Z-쪽)
+    // 칠판(앞쪽 벽)
     const boardW = 24, boardH = 6;
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(boardW, boardH),
-      new THREE.MeshStandardMaterial({ color:0x0f9d58 })
+      new THREE.MeshStandardMaterial({ color:0x0f9d58, roughness:0.9, metalness:0 })
     );
     const BOARD_Z = - (FLOOR_H/2) + 2; // 앞쪽
     board.position.set(0, 6, BOARD_Z);
     classroom.add(board);
 
-    // 칠판 위 라벨(“BOARD”) - 간단 텍스처 (유지)
-    classroom.add(makeTextSprite("BOARD", {x:0, y:9, z:BOARD_Z+0.01}));
+    // ✅ 칠판 라벨: "칠판" (검은 배경 제거, 칠판 중앙 정렬)
+    //    - 위치: 칠판 판면 중앙 (x=0, y=6, z=BOARD_Z + 0.01)
+    //    - 배경: 없음(bg:false)
+    classroom.add(
+      makeTextSprite("칠판", {x:0, y:6, z:BOARD_Z+0.01}, { font:'700 40px system-ui, Arial', scale:0.05, bg:false })
+    );
 
     // 행/열 및 책상 파라미터
     let rows = 4, cols = 6;
@@ -167,6 +174,47 @@
       return { year, seatData };
     }
 
+    // ====== 책상 그룹 생성: 상판 + 4다리 ======
+    function makeDeskGroup(w, h) {
+      const group = new THREE.Group();
+
+      const topThickness = 0.2;     // 상판 두께
+      const legWidth = 0.15;        // 다리 굵기 (정사각 단면)
+      const legHeight = 2.0;        // 다리 길이 (바닥~상판 하단)
+      const topY = legHeight + topThickness/2; // 상판 중심 높이
+
+      // 상판
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(w, topThickness, h),
+        new THREE.MeshStandardMaterial({ color:0x8B4513, roughness:0.9, metalness:0.05 }) // 목재 톤
+      );
+      top.position.set(0, topY, 0);
+      group.add(top);
+
+      // 다리 위치 보정(상판 모서리 안쪽)
+      const dx = (w/2 - legWidth/2) - 0.1;
+      const dz = (h/2 - legWidth/2) - 0.1;
+
+      // 공용 머티리얼(다리: 약간 더 어둡게)
+      const legMat = new THREE.MeshStandardMaterial({ color:0x5A2E0C, roughness:0.9, metalness:0.02 });
+
+      // 4개 다리
+      const legGeo = new THREE.BoxGeometry(legWidth, legHeight, legWidth);
+      const legPositions = [
+        [+dx, legHeight/2, +dz],
+        [-dx, legHeight/2, +dz],
+        [+dx, legHeight/2, -dz],
+        [-dx, legHeight/2, -dz],
+      ];
+      for (const p of legPositions) {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(p[0], p[1], p[2]);
+        group.add(leg);
+      }
+
+      return group;
+    }
+
     // ====== 교실/책상 재구성 ======
     function rebuildClassroom() {
       // 기존 책상 제거
@@ -191,22 +239,22 @@
           const idx = i*cols + j;
           if (idx >= total) break;
 
-          const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(desk.w, 2.2, desk.h),
-            new THREE.MeshStandardMaterial({ color:0x8B4513 })   // Brown (SaddleBrown)
-          );
+          // ✅ 책상: 그룹(상판+다리)으로 생성
+          const mesh = makeDeskGroup(desk.w, desk.h);
           mesh.position.set(
             startX + j*(desk.w + desk.gapX),
-            1.1,
+            0,                                            // 그룹은 바닥 기준
             startZ + i*(desk.h + desk.gapZ)
           );
           classroom.add(mesh);
 
           const d = seatData[idx] || null;
-          // 카드(사진+이름+메모) — 사진이 있으면 세운 이미지 + 라벨(배경 제거, 크기 조정)
+          // 카드(사진+이름+메모)
           let card = null;
           if (d && (d.name || d.memo || d.photo)) {
-            card = makeDeskCard(d, mesh.position);
+            // 📌 기존 기준 높이(1.1)를 유지하도록 basePos.y를 1.1로 고정 전달
+            const basePos = new THREE.Vector3(mesh.position.x, 1.1, mesh.position.z);
+            card = makeDeskCard(d, basePos);
             classroom.add(card);
           }
 
@@ -227,7 +275,7 @@
       canvas.width = tw + padding*2;
       canvas.height = 64 + padding*2;
 
-      // ✅ 배경은 기본 on, opts.bg === false면 배경 생략
+      // ✅ opts.bg === false면 배경 생략
       if (opts.bg !== false) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -274,17 +322,16 @@
         // 액자 받침
         const stand = new THREE.Mesh(
           new THREE.BoxGeometry(imgW+0.2, 0.1, 0.4),
-          new THREE.MeshStandardMaterial({ color:0x333333 })
+          new THREE.MeshStandardMaterial({ color:0x666666 })
         );
         stand.position.set(basePos.x, basePos.y + 1.0, basePos.z - 0.2);
         group.add(stand);
       }
 
-      // ✅ 이름/메모 라벨 (배경 제거, 크기 조정, 겹침 방지 위해 y를 올림)
+      // 이름/메모 라벨 (배경 제거, 크기 조정, 겹침 방지 위해 y를 올림)
       const nameText = (d.name || '').trim() || '(빈자리)';
       const memoText = (d.memo || '').trim();
 
-      // 이름: 조금 작게 (기존 32px → 28px), 배경 제거
       const nameLabel = makeTextSprite(
         nameText,
         { x: basePos.x, y: basePos.y + 3.7, z: basePos.z },
@@ -292,7 +339,6 @@
       );
       group.add(nameLabel);
 
-      // 메모: 더 작게 (22px), 배경 제거, 이름 바로 아래
       if (memoText) {
         const memoLabel = makeTextSprite(
           memoText,
@@ -328,23 +374,22 @@
         const myZ = startZ + r*(desk.h + desk.gapZ);
 
         if (cameraMode === 'fp') {
-          // ✅ 1인칭: '나' 자리 높이에서 칠판을 바라봄
+          // 1인칭: '나' 자리 높이에서 칠판을 바라봄
           camX = myX;
-          camY = 1.6 + 1.2;   // 눈높이(바닥~책상 높이 감안)
+          camY = 1.6 + 1.2;
           camZ = myZ;
           camera.position.set(camX, camY, camZ);
           camera.lookAt(new THREE.Vector3(0, 5, BOARD_Z));
           return;
         } else {
-          // ✅ 3인칭: '나' 자리 뒤에서 20도 내려다보기 느낌(기존 스타일)
+          // 3인칭: 기존 스타일
           camX = myX;
           camY = 18;
           camZ = myZ + 24;
         }
       } else {
-        // '나'가 없으면 기존 중앙 시점 유지
+        // '나'가 없으면
         if (cameraMode === 'fp') {
-          // 1인칭이지만 '나' 없을 때는 중앙 뒤에서 낮은 시선
           camX = 0; camY = 3; camZ = 20;
         } else {
           camX = 0; camY = 18; camZ = 26;
@@ -369,11 +414,10 @@
       placeCameraAtMySeat();
     });
     document.getElementById('centerBoard').addEventListener('click', () => {
-      // 칠판 정면으로
       camera.lookAt(new THREE.Vector3(0, 5, BOARD_Z));
     });
 
-    // ✅ 시점 전환 버튼
+    // 시점 전환 버튼
     document.getElementById('firstPerson').addEventListener('click', () => {
       cameraMode = 'fp';
       placeCameraAtMySeat();
@@ -386,14 +430,12 @@
     // ====== 센서(기기 회전) — 교실을 회전 ======
     let baseAlpha = null;
     function handleOrientation(e) {
-      // e.alpha: 0~360 (기기 방위)
       if (typeof e.alpha !== 'number') return;
-      if (baseAlpha === null) baseAlpha = e.alpha;               // 초기 기준
+      if (baseAlpha === null) baseAlpha = e.alpha;
       const yaw = THREE.MathUtils.degToRad(-(e.alpha - baseAlpha)); // 좌우 반전 유지
       classroom.rotation.y = yaw;
     }
     async function enableSensor() {
-      // iOS 권한 요청
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
           const p = await DeviceOrientationEvent.requestPermission();
@@ -409,8 +451,8 @@
 
     // ====== 터치 제스처(전진/후진) — 교실을 Z방향으로 이동 ======
     let touchStartY = null;
-    let accumZ = 0; // classroom 전후 이동 누적
-    const MOVE_SCALE = 0.04; // 감도
+    let accumZ = 0;
+    const MOVE_SCALE = 0.04;
 
     window.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) touchStartY = e.touches[0].clientY;
@@ -420,7 +462,6 @@
       if (touchStartY === null || e.touches.length !== 1) return;
       const y = e.touches[0].clientY;
       const dy = y - touchStartY;
-      // 아래로 내리면 전진(친구들 쪽으로 이동 = 교실을 -Z)
       accumZ = THREE.MathUtils.clamp(accumZ - dy*MOVE_SCALE, -60, 60);
       classroom.position.z = accumZ;
       touchStartY = y;
@@ -437,8 +478,7 @@
 
     // ====== 초기 빌드 ======
     rebuildClassroom();
-    // ✅ 기본값: 1인칭으로 시작
-    placeCameraAtMySeat();
+    placeCameraAtMySeat(); // 기본: 1인칭
 
     // ====== 루프 ======
     (function animate(){
