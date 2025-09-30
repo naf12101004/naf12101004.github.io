@@ -29,8 +29,6 @@
     /* ===== 모바일 최적화: 너비 640px 이하(폰)에서만 추가 조정 ===== */
     @media (max-width: 640px) {
       #ui { width: min(92vw, 300px); }
-
-      /* (중복이지만 무해) 폰에서도 숨김 유지 */
       #panel-grid { display: none !important; }
 
       /* 연도 패널: 입력/버튼 나란히 컴팩트 */
@@ -66,7 +64,7 @@
 </head>
 <body>
   <div id="ui">
-    <!-- 사용 연도 패널: id 유지 -->
+    <!-- 사용 연도 패널 -->
     <div class="panel" id="panel-year">
       <label>사용할 연도 (저장된 자리배치):</label>
       <input id="year" placeholder="예: 2025" maxlength="4" inputmode="numeric" pattern="\d{4}" />
@@ -86,6 +84,11 @@
     <div class="panel">
       <button id="sensor">📱 센서(회전) 시작</button>
       <button class="secondary" id="centerBoard">🔄 칠판 보기</button>
+      <!-- ✅ 시점 전환 버튼 추가 -->
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="firstPerson" class="secondary">👁️ 1인칭</button>
+        <button id="thirdPerson" class="secondary">🧍 3인칭</button>
+      </div>
     </div>
   </div>
 
@@ -123,7 +126,7 @@
     floor.rotation.x = -Math.PI/2;
     classroom.add(floor);
 
-    // 칠판(앞쪽 벽)
+    // 칠판(앞쪽 벽, 화면 상단 중앙 느낌으로 Z-쪽)
     const boardW = 24, boardH = 6;
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(boardW, boardH),
@@ -133,7 +136,7 @@
     board.position.set(0, 6, BOARD_Z);
     classroom.add(board);
 
-    // 칠판 위 라벨(“BOARD”) - 그대로 유지 (원하시면 이후 주석 처리만 안내 가능)
+    // 칠판 위 라벨(“BOARD”) - 간단 텍스처 (유지)
     classroom.add(makeTextSprite("BOARD", {x:0, y:9, z:BOARD_Z+0.01}));
 
     // 행/열 및 책상 파라미터
@@ -146,9 +149,11 @@
       const year = (document.getElementById('year').value || localStorage.getItem('savedYear') || '').trim();
       if (year) document.getElementById('year').value = year;
 
+      // seatData_YEAR
       const raw = year ? localStorage.getItem(`seatData_${year}`) : null;
       const seatData = raw ? JSON.parse(raw) : [];
 
+      // 저장된 레이아웃 메타(있으면 사용). 없으면 입력창/기본값.
       const metaRows = parseInt(localStorage.getItem(`layout_rows_${year}`) || '') || parseInt(document.getElementById('rows').value || '') || rows;
       const metaCols = parseInt(localStorage.getItem(`layout_cols_${year}`) || '') || parseInt(document.getElementById('cols').value || '') || cols;
 
@@ -171,6 +176,7 @@
       });
       desks = [];
 
+      // 현재 seatData
       const { seatData } = loadSaved();
       const total = Math.max(seatData.length || 0, rows*cols);
 
@@ -197,11 +203,13 @@
           classroom.add(mesh);
 
           const d = seatData[idx] || null;
+          // 카드(사진+이름+메모) — 사진이 있으면 세운 이미지 + 라벨(배경 제거, 크기 조정)
           let card = null;
           if (d && (d.name || d.memo || d.photo)) {
             card = makeDeskCard(d, mesh.position);
             classroom.add(card);
           }
+
           desks.push({ mesh, card, data:d, index:idx, rc:{r:i, c:j} });
         }
       }
@@ -219,9 +227,11 @@
       canvas.width = tw + padding*2;
       canvas.height = 64 + padding*2;
 
-      // 배경 반투명
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // ✅ 배경은 기본 on, opts.bg === false면 배경 생략
+      if (opts.bg !== false) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       // 글자
       ctx.font = font;
@@ -233,7 +243,7 @@
       tex.minFilter = THREE.LinearFilter;
       const material = new THREE.SpriteMaterial({ map: tex, transparent:true });
       const sprite = new THREE.Sprite(material);
-      const scale = opts.scale || 0.06;
+      const scale = opts.scale || 0.06; // 화면 너비 비례 감
       sprite.scale.set(canvas.width*scale, canvas.height*scale, 1);
       sprite.position.set(pos.x, pos.y, pos.z);
       return sprite;
@@ -242,6 +252,8 @@
     // ====== 책상 카드(사진 + 텍스트) ======
     function makeDeskCard(d, basePos) {
       const group = new THREE.Group();
+
+      // 사진
       if (d.photo) {
         const tex = new THREE.TextureLoader().load(d.photo);
         const imgW = 3.2, imgH = 2.2;
@@ -259,6 +271,7 @@
 
         group.add(photo);
 
+        // 액자 받침
         const stand = new THREE.Mesh(
           new THREE.BoxGeometry(imgW+0.2, 0.1, 0.4),
           new THREE.MeshStandardMaterial({ color:0x333333 })
@@ -267,19 +280,35 @@
         group.add(stand);
       }
 
-      const nameText = (d.name || '').trim();
+      // ✅ 이름/메모 라벨 (배경 제거, 크기 조정, 겹침 방지 위해 y를 올림)
+      const nameText = (d.name || '').trim() || '(빈자리)';
       const memoText = (d.memo || '').trim();
-      const label = makeTextSprite(
-        (nameText ? nameText : '(빈자리)') + (memoText ? ` · ${memoText}` : ''),
-        {x: basePos.x, y: basePos.y + 3.1, z: basePos.z},
-        {font:'600 32px system-ui, Arial', scale:0.05}
+
+      // 이름: 조금 작게 (기존 32px → 28px), 배경 제거
+      const nameLabel = makeTextSprite(
+        nameText,
+        { x: basePos.x, y: basePos.y + 3.7, z: basePos.z },
+        { font:'600 28px system-ui, Arial', scale:0.045, bg:false }
       );
-      group.add(label);
+      group.add(nameLabel);
+
+      // 메모: 더 작게 (22px), 배경 제거, 이름 바로 아래
+      if (memoText) {
+        const memoLabel = makeTextSprite(
+          memoText,
+          { x: basePos.x, y: basePos.y + 3.25, z: basePos.z },
+          { font:'500 22px system-ui, Arial', scale:0.04, bg:false }
+        );
+        group.add(memoLabel);
+      }
 
       return group;
     }
 
-    // ====== “나” 자리 기준 카메라 배치 ======
+    // ====== 시점(카메라) 모드 ======
+    let cameraMode = 'fp'; // 'fp' = 1인칭(기본), 'tp' = 3인칭
+
+    // ====== “나” 자리 기준 카메라 배치 (모드 반영) ======
     function placeCameraAtMySeat() {
       const { seatData } = loadSaved();
       const myIndex = (seatData || []).findIndex(d => d && typeof d.name === 'string' && d.name.trim() === '나');
@@ -289,17 +318,39 @@
       const startX = -totalW/2 + desk.w/2;
       const startZ = -totalH/2 + desk.h/2;
 
+      // 기본(중앙) 값
       let camX = 0, camY = 16, camZ = 26;
+
       if (myIndex >= 0) {
         const r = Math.floor(myIndex / cols);
         const c = myIndex % cols;
         const myX = startX + c*(desk.w + desk.gapX);
         const myZ = startZ + r*(desk.h + desk.gapZ);
 
-        camX = myX;
-        camY = 18;
-        camZ = myZ + 24;
+        if (cameraMode === 'fp') {
+          // ✅ 1인칭: '나' 자리 높이에서 칠판을 바라봄
+          camX = myX;
+          camY = 1.6 + 1.2;   // 눈높이(바닥~책상 높이 감안)
+          camZ = myZ;
+          camera.position.set(camX, camY, camZ);
+          camera.lookAt(new THREE.Vector3(0, 5, BOARD_Z));
+          return;
+        } else {
+          // ✅ 3인칭: '나' 자리 뒤에서 20도 내려다보기 느낌(기존 스타일)
+          camX = myX;
+          camY = 18;
+          camZ = myZ + 24;
+        }
+      } else {
+        // '나'가 없으면 기존 중앙 시점 유지
+        if (cameraMode === 'fp') {
+          // 1인칭이지만 '나' 없을 때는 중앙 뒤에서 낮은 시선
+          camX = 0; camY = 3; camZ = 20;
+        } else {
+          camX = 0; camY = 18; camZ = 26;
+        }
       }
+
       camera.position.set(camX, camY, camZ);
       camera.lookAt(new THREE.Vector3(0, 5, BOARD_Z));
     }
@@ -318,19 +369,31 @@
       placeCameraAtMySeat();
     });
     document.getElementById('centerBoard').addEventListener('click', () => {
-      camera.position.set(0, 18, 26);
+      // 칠판 정면으로
       camera.lookAt(new THREE.Vector3(0, 5, BOARD_Z));
+    });
+
+    // ✅ 시점 전환 버튼
+    document.getElementById('firstPerson').addEventListener('click', () => {
+      cameraMode = 'fp';
+      placeCameraAtMySeat();
+    });
+    document.getElementById('thirdPerson').addEventListener('click', () => {
+      cameraMode = 'tp';
+      placeCameraAtMySeat();
     });
 
     // ====== 센서(기기 회전) — 교실을 회전 ======
     let baseAlpha = null;
     function handleOrientation(e) {
+      // e.alpha: 0~360 (기기 방위)
       if (typeof e.alpha !== 'number') return;
-      if (baseAlpha === null) baseAlpha = e.alpha;
-      const yaw = THREE.MathUtils.degToRad(-(e.alpha - baseAlpha)); // 좌우 반전
+      if (baseAlpha === null) baseAlpha = e.alpha;               // 초기 기준
+      const yaw = THREE.MathUtils.degToRad(-(e.alpha - baseAlpha)); // 좌우 반전 유지
       classroom.rotation.y = yaw;
     }
     async function enableSensor() {
+      // iOS 권한 요청
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
           const p = await DeviceOrientationEvent.requestPermission();
@@ -346,8 +409,8 @@
 
     // ====== 터치 제스처(전진/후진) — 교실을 Z방향으로 이동 ======
     let touchStartY = null;
-    let accumZ = 0;
-    const MOVE_SCALE = 0.04;
+    let accumZ = 0; // classroom 전후 이동 누적
+    const MOVE_SCALE = 0.04; // 감도
 
     window.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) touchStartY = e.touches[0].clientY;
@@ -357,6 +420,7 @@
       if (touchStartY === null || e.touches.length !== 1) return;
       const y = e.touches[0].clientY;
       const dy = y - touchStartY;
+      // 아래로 내리면 전진(친구들 쪽으로 이동 = 교실을 -Z)
       accumZ = THREE.MathUtils.clamp(accumZ - dy*MOVE_SCALE, -60, 60);
       classroom.position.z = accumZ;
       touchStartY = y;
@@ -373,6 +437,7 @@
 
     // ====== 초기 빌드 ======
     rebuildClassroom();
+    // ✅ 기본값: 1인칭으로 시작
     placeCameraAtMySeat();
 
     // ====== 루프 ======
