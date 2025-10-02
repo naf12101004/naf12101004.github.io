@@ -276,55 +276,52 @@
       return sprite;
     }
 
-    // ====== 책상 카드(사진 + 텍스트) ======
-    function makeDeskCard(d, basePos) {
-      const group = new THREE.Group();
+// ====== 책상 카드(사진 + 텍스트) ======
+function makeDeskCard(d, basePos) {
+  const group = new THREE.Group();
 
-      // 사진
-      if (d && d.photo) {
-        const tex = new THREE.TextureLoader().load(d.photo);
-        const imgW = 3.2, imgH = 2.2;
-        const photo = new THREE.Mesh(
-          new THREE.PlaneGeometry(imgW, imgH),
-          new THREE.MeshStandardMaterial({ map: tex, roughness:1, metalness:0, side:THREE.DoubleSide })
-        );
-        photo.position.set(basePos.x, basePos.y + 2.0, basePos.z);
-        photo.rotation.y = 0;
+  // 사진
+  if (d && d.photo) {
+    const tex = new THREE.TextureLoader().load(d.photo);
+    const imgW = 3.2, imgH = 2.2;
+    const photo = new THREE.Mesh(
+      new THREE.PlaneGeometry(imgW, imgH),
+      new THREE.MeshStandardMaterial({ map: tex, roughness:1, metalness:0, side:THREE.DoubleSide })
+    );
+    photo.position.set(basePos.x, basePos.y + 2.0, basePos.z);
+    group.add(photo);
 
-        photo.userData = { fullsize: d.photo };
-        photo.cursor = 'pointer';
-        photo.callback = () => showPhotoModal(d.photo);
-        group.add(photo);
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(imgW+0.2, 0.1, 0.4),
+      new THREE.MeshStandardMaterial({ color:0x666666 })
+    );
+    stand.position.set(basePos.x, basePos.y + 1.0, basePos.z - 0.2);
+    group.add(stand);
+  }
 
-        const stand = new THREE.Mesh(
-          new THREE.BoxGeometry(imgW+0.2, 0.1, 0.4),
-          new THREE.MeshStandardMaterial({ color:0x666666 })
-        );
-        stand.position.set(basePos.x, basePos.y + 1.0, basePos.z - 0.2);
-        group.add(stand);
-      }
+  // 이름 라벨 (조금 더 위로 올림)
+  const nameText = (d && d.name ? d.name : '').trim() || '(빈자리)';
+  const nameLabel = makeTextSprite(
+    nameText,
+    { x: basePos.x, y: basePos.y + 4.0, z: basePos.z }, // 원래 +3.7 → +4.0
+    { font:'600 28px system-ui, Arial', scale:0.045, bg:false }
+  );
+  group.add(nameLabel);
 
-      // 이름/메모 라벨 (배경 제거, 겹침 방지로 위로 올림)
-      const nameText = (d && d.name ? d.name : '').trim() || '(빈자리)';
-      const memoText = (d && d.memo ? d.memo : '').trim();
+  // 메모 라벨 (더 작게 + 이름보다 조금 아래)
+  const memoText = (d && d.memo ? d.memo : '').trim();
+  if (memoText) {
+    const memoLabel = makeTextSprite(
+      memoText,
+      { x: basePos.x, y: basePos.y + 3.6, z: basePos.z }, // 원래 +3.25 → +3.6
+      { font:'500 22px system-ui, Arial', scale:0.024, bg:false } // 원래 0.04 → 0.024 (60%)
+    );
+    group.add(memoLabel);
+  }
 
-      const nameLabel = makeTextSprite(
-        nameText,
-        { x: basePos.x, y: basePos.y + 3.7, z: basePos.z },
-        { font:'600 28px system-ui, Arial', scale:0.045, bg:false }
-      );
-      group.add(nameLabel);
+  return group;
+}
 
-      if (memoText) {
-        const memoLabel = makeTextSprite(
-          memoText,
-          { x: basePos.x, y: basePos.y + 3.25, z: basePos.z },
-          { font:'500 22px system-ui, Arial', scale:0.04, bg:false }
-        );
-        group.add(memoLabel);
-      }
-      return group;
-    }
 
     // ====== 시점(카메라) 모드 ======
     let cameraMode = 'tp'; // 기본 3인칭
