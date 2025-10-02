@@ -163,9 +163,9 @@
     function makeDeskGroup(w, h) {
       const group = new THREE.Group();
 
-      const topThickness = 0.2;
-      const legWidth = 0.15;
-      const legHeight = 2.0;
+      const topThickness = 0.2; //상판 두께
+      const legWidth = 0.3; //다리 굵기 (숫자가 클수록 굵음)
+      const legHeight = 2.0; // 다리높이
       const topY = legHeight + topThickness/2;
 
       // 상판
