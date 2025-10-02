@@ -313,7 +313,7 @@ function makeDeskCard(d, basePos) {
   if (memoText) {
     const memoLabel = makeTextSprite(
       memoText,
-      { x: basePos.x, y: basePos.y + 3.6, z: basePos.z }, // 원래 +3.25 → +3.6
+      { x: basePos.x, y: basePos.y + 5, z: basePos.z }, // 원래 +3.25 → +3.6
       { font:'500 22px system-ui, Arial', scale:0.014, bg:false } // 원래 0.04 → 0.014
     );
     group.add(memoLabel);
